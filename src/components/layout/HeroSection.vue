@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import DiagonalBlocks from '@/components/ui/DiagonalBlocks.vue'
 
 const router = useRouter()
 
@@ -18,6 +19,9 @@ const smallHeroImage = new URL('@/assets/images/hero/mainPage-hero-small.jpg', i
   <div
     class="relative w-full hero-height flex flex-col items-center justify-center text-center overflow-hidden"
   >
+    <!-- Ukośne bloki dekoracyjne - teraz tylko ostre kreski -->
+    <DiagonalBlocks topColor="#ffffff" bottomColor="#1f2937" />
+
     <!-- Tło -->
     <div class="absolute inset-0 w-full h-full">
       <!-- Zdjęcie desktop (ukryte na małych ekranach) -->
@@ -38,27 +42,35 @@ const smallHeroImage = new URL('@/assets/images/hero/mainPage-hero-small.jpg', i
       ></div>
       <!-- Przyciemnione tło obrazka (jedna warstwa) -->
       <div class="absolute inset-0 bg-black opacity-35"></div>
-      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"
+      ></div>
     </div>
-
-    <div class="relative z-10 px-4 sm:px-6 md:px-8 max-w-3xl mx-auto">
-      <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 hero-shadow">
-        Odkrywaj świat z TravelMate
-      </h1>
-      <p class="text-lg md:text-xl text-white mb-10 max-w-xl mx-auto hero-shadow">
-        Zaplanuj swoją wymarzoną podróż bez stresu. Wszystko czego potrzebujesz w jednym miejscu:
-        loty, noclegi i atrakcje z najlepszymi cenami.
-      </p>
+    <div
+      class="relative z-10 px-4 sm:px-6 md:px-8 max-w-3xl mx-auto flex flex-col justify-between gap-8"
+    >
+      <div>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 hero-shadow">
+          Odkrywaj świat z TravelMate
+        </h1>
+        <p class="text-lg md:text-xl text-white max-w-xl mx-auto hero-shadow">
+          Zaplanuj swoją wymarzoną podróż bez stresu. Wszystko czego potrzebujesz w jednym miejscu:
+          loty, noclegi i atrakcje z najlepszymi cenami.
+        </p>
+      </div>
 
       <!-- Przycisk z animacją -->
-      <AnimatedButton
-        variant="primary"
-        size="default"
-        animation-color="rgba(255, 255, 255, 0.2)"
-        @click="navigateToPlanner"
-      >
-        Zaplanuj podróż teraz!
-      </AnimatedButton>
+      <div>
+        <AnimatedButton
+          variant="primary"
+          size="default"
+          animation-color="rgba(255, 255, 255, 0.2)"
+          @click="navigateToPlanner"
+          class="py-3.5 px-7"
+        >
+          Zaplanuj podróż teraz!
+        </AnimatedButton>
+      </div>
     </div>
   </div>
 </template>
@@ -73,23 +85,21 @@ const smallHeroImage = new URL('@/assets/images/hero/mainPage-hero-small.jpg', i
 .hero-height {
   height: calc(100vh - 5rem);
   margin-bottom: -1px;
-  position: relative; 
+  position: relative;
   width: 100vw;
-  margin-left: calc(-50vw + 50%)
+  margin-left: calc(-50vw + 50%);
 }
 
-/* Dla mniejszych ekranów  */
+/* Responsywny odstęp dla różnych rozmiarów ekranu */
 @media (max-width: 768px) {
-  .hero-height {
-    height: calc(100vh - 5rem);
-    min-height: 400px;
+  .gap-8 {
+    gap: 1.5rem;
   }
 }
 
-/* Dla bardzo małych ekranów */
 @media (max-width: 640px) {
-  .hero-height {
-    min-height: 350px;
+  .gap-8 {
+    gap: 1.25rem;
   }
 }
 </style>

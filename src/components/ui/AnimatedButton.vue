@@ -23,9 +23,9 @@ defineProps({
       'bg-gray-500 hover:bg-gray-600 text-white': variant === 'secondary',
       'bg-transparent border border-gray-300 hover:bg-gray-100 text-gray-700':
         variant === 'outline',
-      'px-2 py-1 text-xs sm:text-sm': size === 'small',
-      'px-4 sm:px-6 py-3 font-medium': size === 'default',
-      'px-6 sm:px-8 py-4 text-lg font-medium': size === 'large',
+      'px-3 py-1.5 text-xs sm:text-sm': size === 'small',
+      'px-5 sm:px-7 py-3.5 font-medium': size === 'default',
+      'px-7 sm:px-9 py-4.5 text-lg font-medium': size === 'large',
       'rounded-lg shadow-lg hover:shadow-xl': true,
     }"
     :style="animationColor ? `--animation-color: ${animationColor};` : ''"

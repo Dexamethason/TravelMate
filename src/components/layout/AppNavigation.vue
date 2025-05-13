@@ -74,7 +74,7 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 }
 
-// Obsługa przewijania - dodawanie cienia przy scrollowaniu
+// Obsługa przewijania
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 10
 }
@@ -171,25 +171,25 @@ const handleLogoClick = () => {
             <div class="flex space-x-1 lg:space-x-6 xl:space-x-10">
               <router-link
                 to="/planner"
-                class="text-gray-700 hover:text-gray-900 px-2 lg:px-3 py-2 text-sm lg:text-base font-medium nav-link"
+                class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
               >
                 Planer
               </router-link>
               <router-link
                 to="/flights"
-                class="text-gray-700 hover:text-gray-900 px-2 lg:px-3 py-2 text-sm lg:text-base font-medium nav-link"
+                class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
               >
                 Loty
               </router-link>
               <router-link
                 to="/accommodations"
-                class="text-gray-700 hover:text-gray-900 px-2 lg:px-3 py-2 text-sm lg:text-base font-medium nav-link"
+                class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
               >
                 Noclegi
               </router-link>
               <router-link
                 to="/attractions"
-                class="text-gray-700 hover:text-gray-900 px-2 lg:px-3 py-2 text-sm lg:text-base font-medium nav-link"
+                class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
               >
                 Atrakcje
               </router-link>
@@ -214,36 +214,36 @@ const handleLogoClick = () => {
 
             <!-- Przyciski logowania -->
             <template v-if="isLoggedIn">
-  <!-- Wyloguj na dużych ekranach, ikona na małych -->
-  <AnimatedButton
-    variant="secondary"
-    size="small"
-    @click="toggleLogin"
-    class="hidden md:inline-flex nav-btn"
-  >
-    Wyloguj
-  </AnimatedButton>
-  <router-link
-    to="/profile"
-    @click="handleAuthClick"
-    class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
-  >
-    <i class="fas fa-user text-gray-600"></i>
-  </router-link>
-</template>
+              <!-- Wyloguj na dużych ekranach, ikona na małych -->
+              <AnimatedButton
+                variant="secondary"
+                size="small"
+                @click="toggleLogin"
+                class="hidden md:inline-flex nav-btn"
+              >
+                Wyloguj
+              </AnimatedButton>
+              <router-link
+                to="/profile"
+                @click="handleAuthClick"
+                class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer"
+              >
+                <i class="fas fa-user text-gray-600"></i>
+              </router-link>
+            </template>
             <template v-else>
               <!-- Przyciski na dużych ekranach -->
-              <div class="hidden md:flex space-x-1 md:space-x-1 lg:space-x-2">
+              <div class="hidden md:flex space-x-3 md:space-x-4 lg:space-x-4">
                 <AnimatedButton
                   variant="secondary"
                   size="small"
                   @click="toggleLogin"
-                  class="nav-btn"
+                  class="nav-btn px-5 py-2.5"
                 >
                   Zaloguj
                 </AnimatedButton>
                 <router-link to="/auth/register" @click="handleAuthClick">
-                  <AnimatedButton variant="primary" size="small" class="nav-btn">
+                  <AnimatedButton variant="primary" size="small" class="nav-btn px-5 py-2.5">
                     <span class="hidden sm:inline">Załóż konto</span>
                     <span class="sm:hidden">Rejestracja</span>
                   </AnimatedButton>
@@ -434,7 +434,7 @@ header.fixed {
   transition: box-shadow 0.3s ease;
 }
 
-/* Podkreślenie pod linkami */
+/* Podkreślenie pod linkami nawigacyjnymi */
 .nav-link {
   position: relative;
 }
@@ -558,18 +558,18 @@ header.fixed {
   }
 }
 
-
-
-/* Fixy responsywności dla breakpointów między LG i XL */
-@media (min-width: 1024px) and (max-width: 1059px) {
+/* Fixy responsywności */
+@media (min-width: 1024px) and (max-width: 1140px) {
   .nav-link {
-    padding-left: 0.5rem ;
-    padding-right: 0.5rem ;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 
   .nav-btn {
-    padding-left: 0.5rem ;
-    padding-right: 0.5rem ;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 }
+
+
 </style>
