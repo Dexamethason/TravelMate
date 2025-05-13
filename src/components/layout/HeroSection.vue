@@ -8,6 +8,9 @@ const router = useRouter()
 const navigateToPlanner = () => {
   router.push('/planner')
 }
+
+const bigHeroImage = new URL('@/assets/images/hero/mainPage-hero-big.jpg', import.meta.url).href
+const smallHeroImage = new URL('@/assets/images/hero/mainPage-hero-small.jpg', import.meta.url).href
 </script>
 
 <template>
@@ -21,7 +24,7 @@ const navigateToPlanner = () => {
       <div
         class="hidden md:block w-full h-full bg-cover bg-center"
         :style="{
-          backgroundImage: 'url(/src/assets/images/hero/mainPage-hero-big.jpg)',
+          backgroundImage: `url(${bigHeroImage})`,
           backgroundAttachment: 'fixed',
         }"
       ></div>
@@ -29,12 +32,13 @@ const navigateToPlanner = () => {
       <div
         class="md:hidden w-full h-full bg-cover bg-center"
         :style="{
-          backgroundImage: 'url(/src/assets/images/hero/mainPage-hero-small.jpg)',
-          backgroundAttachment: 'fixed',
+          backgroundImage: `url(${smallHeroImage})`,
+          backgroundAttachment: 'scroll',
         }"
       ></div>
       <!-- Przyciemnione tło obrazka (jedna warstwa) -->
       <div class="absolute inset-0 bg-black opacity-35"></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
     </div>
 
     <div class="relative z-10 px-4 sm:px-6 md:px-8 max-w-3xl mx-auto">

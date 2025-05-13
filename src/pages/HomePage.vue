@@ -8,9 +8,5 @@ import AppLayout from '@/components/layout/AppLayout.vue'
     <!-- Sekcja hero na całą szerokość -->
     <HeroSection />
 
-    <AppLayout>
-      <div class="py-8 md:py-12">
-      </div>
-    </AppLayout>
   </div>
 </template>
