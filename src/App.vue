@@ -4,19 +4,11 @@ import AppNavigation from './components/layout/AppNavigation.vue'
 
 <template>
   <div class="min-w-[250px]">
-    <!-- Komponent nawigacyjny -->
+    <!-- Komponent nawigacyjny - szerokość 100% -->
     <AppNavigation />
 
-    <!-- Główny obszar treści z widokiem routera -->
-    <main
-      class="w-full mx-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8"
-      :class="{
-        'max-w-full': true,
-        'lg:max-w-[90%]': true,
-        'xl:max-w-[85%]': true,
-        '2xl:max-w-7xl': true,
-      }"
-    >
+    <!-- Główny obszar treści z widokiem routera - pełna szerokość -->
+    <main class="w-full py-0 sm:py-0 md:py-0">
       <router-view />
     </main>
   </div>
@@ -30,5 +22,4 @@ body {
   min-width: 250px;
   overflow-x: hidden;
 }
-
 </style>
