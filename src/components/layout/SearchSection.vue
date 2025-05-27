@@ -5,7 +5,8 @@ import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 
 <template>
   <section class="py-8 bg-white shadow-md">
-    <div class="container mx-auto px-4">
+    <!-- Stała szerokość 1184px, płynne przesuwanie poniżej -->
+    <div class="w-full mx-auto px-4 sm:px-6 md:px-8" style="width: min(1184px, 100vw)">
       <form class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- pole na miasto -->
         <div class="space-y-2">

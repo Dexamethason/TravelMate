@@ -2,16 +2,8 @@
 
 <template>
   <div>
-    <!-- utrzymanie stalych wymiarow na stronie -->
-    <div
-      class="w-full mx-auto px-4 sm:px-6"
-      :class="{
-        'max-w-full': true,
-        'lg:max-w-[90%]': true,
-        'xl:max-w-[80%]': true,
-        '2xl:max-w-[60%]': true,
-      }"
-    >
+    <!-- Stała szerokość 1184px, płynne przesuwanie poniżej -->
+    <div class="w-full mx-auto px-4 sm:px-6 md:px-8" style="width: min(1184px, 100vw)">
       <slot></slot>
     </div>
   </div>
