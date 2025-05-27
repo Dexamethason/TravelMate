@@ -136,18 +136,17 @@ const handleLogoClick = () => {
   <div class="h-20 w-full"></div>
 
   <header
-    class="fixed top-0 left-0 right-0 bg-white w-full z-50 transition-shadow duration-300"
+    class="fixed top-0 left-0 right-0 bg-white z-50 transition-shadow duration-300"
     :class="{ 'shadow-md': isScrolled || isMobileMenuOpen }"
   >
-    <!-- Główny wrapper -->
-    <div class="w-full">
+    <div>
       <!-- Container z dostosowaniem do różnych ekranów -->
       <div
         class="w-full px-1 sm:px-4 md:px-6 mx-auto"
         :class="{
           'max-w-full': true,
-          'lg:max-w-[60%]': true,
-          'xl:max-w-[60%]': true,
+          'lg:max-w-[90%]': true,
+          'xl:max-w-[80%]': true,
           '2xl:max-w-[60%]': true,
         }"
       >
@@ -197,9 +196,7 @@ const handleLogoClick = () => {
           </nav>
 
           <!-- Przyciski prawej strony -->
-          <div
-            class="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4 flex-shrink-0"
-          >
+          <div class="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4 flex-shrink-0">
             <!-- Dropdown języka/waluty (tylko na desktop) -->
             <div class="hidden lg:block relative">
               <button
