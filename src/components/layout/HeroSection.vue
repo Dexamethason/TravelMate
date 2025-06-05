@@ -19,7 +19,7 @@ const smallHeroImage = new URL('@/assets/images/hero/mainPage-hero-small.jpg', i
   <div
     class="relative w-full hero-height flex flex-col items-center justify-center text-center overflow-hidden"
   >
-    <!-- Ukośne bloki dekoracyjne - teraz tylko ostre kreski -->
+    <!-- Ukośne bloki dekoracyjne  -->
     <DiagonalBlocks topColor="#ffffff" bottomColor="#1f2937" />
 
     <!-- Tło -->

@@ -14,9 +14,15 @@ const currencyDropdownRef = ref<HTMLElement | null>(null)
 const currencyButtonRef = ref<HTMLElement | null>(null)
 const mobileButtonRef = ref<HTMLElement | null>(null)
 
-// Blokada scrollowania przy otwartym menu/modalu
-const setBodyOverflow = (isLocked: boolean) => {
-  document.body.style.overflow = isLocked ? 'hidden' : ''
+// Uproszczona kontrola przewijania - tylko pionowe gdy potrzebne
+const setBodyOverflow = (lockVertical: boolean) => {
+  // Poziome przewijanie zawsze zablokowane przez CSS globalny
+  // Kontrolujemy tylko pionowe przewijanie dla modal
+  if (lockVertical) {
+    document.body.style.overflowY = 'hidden'
+  } else {
+    document.body.style.overflowY = 'auto'
+  }
 }
 
 // Otwieranie hamburger menu
@@ -134,10 +140,9 @@ const handleLogoClick = () => {
 <template>
   <!-- Pusty element do utrzymania przestrzeni pod nawigacją -->
   <div class="h-20 w-full"></div>
-
-  <header class="fixed top-0 left-0 right-0 bg-white z-50">
-    <!-- Stała szerokość 1184px, płynne przesuwanie poniżej -->
-    <div class="w-full mx-auto px-4 sm:px-6 md:px-8" style="width: min(1184px, 100vw)">
+  <header class="fixed top-0 left-0 right-0 bg-white z-50 nav-header">
+    <!-- Kontener z ograniczoną szerokością -->
+    <div class="w-full mx-auto px-4 sm:px-6 md:px-8 nav-container">
       <div class="flex justify-between h-20">
         <!-- Logo -->
         <div class="flex-shrink-0 flex items-center">
@@ -186,7 +191,7 @@ const handleLogoClick = () => {
         <!-- Przyciski prawej strony -->
         <div class="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4">
           <!-- Dropdown języka/waluty (tylko na desktop) -->
-          <div class="hidden lg:block relative min-w-[80px]">
+          <div class="hidden lg:block relative currency-dropdown">
             <button
               ref="currencyButtonRef"
               @click="toggleLanguageCurrency()"
@@ -203,7 +208,7 @@ const handleLogoClick = () => {
               variant="secondary"
               size="small"
               @click="toggleLogin"
-              class="hidden md:inline-flex nav-btn min-w-[80px]"
+              class="hidden md:inline-flex nav-btn auth-btn-desktop"
             >
               Wyloguj
             </AnimatedButton>
@@ -223,7 +228,7 @@ const handleLogoClick = () => {
                 variant="secondary"
                 size="small"
                 @click="toggleLogin"
-                class="nav-btn px-3 py-2 min-w-[70px] text-sm"
+                class="nav-btn auth-btn px-3 py-2 text-sm"
               >
                 Zaloguj
               </AnimatedButton>
@@ -231,7 +236,7 @@ const handleLogoClick = () => {
                 <AnimatedButton
                   variant="primary"
                   size="small"
-                  class="nav-btn px-3 py-2 min-w-[80px] text-sm"
+                  class="nav-btn auth-btn px-3 py-2 text-sm"
                 >
                   Konto
                 </AnimatedButton>
@@ -269,10 +274,42 @@ const handleLogoClick = () => {
   <!-- Menu na mobilce -->
   <transition name="mobile-nav">
     <div v-if="isMobileMenuOpen" class="lg:hidden bg-white mobile-menu">
-      <div class="mx-auto" style="width: min(1198px, 100vw)">
-        <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          <!-- linki bez zmian -->
+      <div class="w-full mx-auto px-3 sm:px-4 md:px-6">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+          <router-link
+            to="/planner"
+            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
+            :class="{ 'mobile-active': $route.path === '/planner' }"
+            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
+          >
+            Planer
+          </router-link>
+          <router-link
+            to="/flights"
+            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
+            :class="{ 'mobile-active': $route.path === '/flights' }"
+            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
+          >
+            Loty
+          </router-link>
+          <router-link
+            to="/accommodations"
+            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
+            :class="{ 'mobile-active': $route.path === '/accommodations' }"
+            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
+          >
+            Noclegi
+          </router-link>
+          <router-link
+            to="/attractions"
+            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
+            :class="{ 'mobile-active': $route.path === '/attractions' }"
+            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
+          >
+            Atrakcje
+          </router-link>
         </div>
+        
         <div class="pt-4 pb-3 border-t border-gray-200">
           <!-- Język i Waluta -->
           <div class="flex items-center justify-between px-4">
@@ -373,14 +410,18 @@ const handleLogoClick = () => {
 </template>
 
 <style scoped>
-/* Usuń media query dla xl breakpoint */
-/* @media (min-width: 1024px) and (max-width: 1140px) - USUŃ TO */
-
-header.fixed {
-  transition: box-shadow 0.3s ease;
+/* Nawigacja */
+.nav-header {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
-/* Podkreślenie pod linkami nawigacyjnymi */
+.nav-container {
+  max-width: min(1184px, 100vw);
+  overflow-x: hidden;
+}
+
+/* Animacja podkreślenia */
 .nav-link {
   position: relative;
 }
@@ -392,7 +433,7 @@ header.fixed {
   height: 2px;
   bottom: 0;
   left: 50%;
-  background-color: #000000;
+  background-color: #10b981; /* primary-500 */
   transform: translateX(-50%);
   transition: width 0.3s ease;
 }
@@ -401,106 +442,146 @@ header.fixed {
   width: 100%;
 }
 
-/* Indykator aktywnej strony */
+/* Aktywna strona */
 .router-link-active.nav-link::after {
   width: 100%;
 }
 
-/* Pogrubienie aktywnej strony */
 .router-link-active.nav-link {
-  color: #1f2937;
+  color: #059669; /* primary-600 */
   font-weight: 600;
 }
 
-/* Wyróżnienie aktywnej strony w menu na mobilce */
+/* Style dla linków mobilnych */
 .mobile-active {
-  color: #1f2937;
+  color: #059669;
   font-weight: 600;
   border-left: 3px solid #10b981;
   padding-left: calc(0.75rem - 3px);
-  background-color: #f3f4f6;
+  background-color: #f0fdf4; /* green-50 */
 }
 
-/* Animacja menu na mobilce */
+/* Menu mobilne */
+.mobile-menu {
+  position: fixed;
+  top: 80px;
+  left: 0;
+  right: 0;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 1001;
+  background-color: white;
+  width: 100vw;
+  max-width: 100vw;
+}
+
+/* Modal */
+.modal-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100vw;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  max-width: 100vw;
+}
+
+.modal-content {
+  position: relative;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: min(600px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Responsywne style dla małych ekranów */
+@media (max-width: 320px) {
+  .nav-container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    max-width: 320px;
+  }
+
+  .logo-icon {
+    height: 2rem;
+    width: 2rem;
+    font-size: 0.75rem;
+  }
+
+  .logo-text {
+    font-size: 0.875rem;
+    margin-left: 0.5rem;
+  }
+
+  .auth-btn {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    min-width: 50px;
+    font-size: 0.75rem;
+  }
+
+  .currency-dropdown {
+    min-width: 50px;
+    font-size: 0.75rem;
+  }
+
+  .mobile-menu {
+    width: 320px;
+    max-width: 320px;
+  }
+
+  .modal-content {
+    max-width: calc(320px - 2rem);
+  }
+}
+
+@media (max-width: 375px) {
+  .nav-container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .mobile-menu {
+    max-width: 375px;
+  }
+}
+
+/* Animacje */
 .mobile-nav-enter-active,
 .mobile-nav-leave-active {
   transition: all 0.3s ease;
-  max-height: 400px;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .mobile-nav-enter-from,
 .mobile-nav-leave-to {
-  max-height: 0;
   opacity: 0;
   transform: translateY(-10px);
 }
 
-.mobile-nav-enter-to,
-.mobile-nav-leave-from {
-  max-height: 400px;
-  opacity: 1;
-  transform: translateY(0);
+/* Flex zabezpieczenia */
+.flex {
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* Menu mobilne z maksymalną wysokością, aby umożliwić scrollowanie */
-.mobile-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: calc(100vh - 5rem);
-  overflow-y: auto;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-/* Style dla modalki */
-.modal-wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  z-index: 999;
-  padding-top: 50px;
-  pointer-events: none;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.25);
-  pointer-events: auto;
-}
-
-.modal-content {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  position: relative;
-  pointer-events: auto;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  z-index: 1000;
-}
-
-/* Responsywność modala */
-@media (max-width: 850px) {
-  .modal-content {
-    max-width: 95%;
-    max-height: 90vh;
-  }
+.flex-shrink-0 {
+  flex-shrink: 0;
 }
 </style>

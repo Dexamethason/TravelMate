@@ -13,13 +13,14 @@ import AppFooter from './components/layout/AppFooter.vue'
       <router-view />
     </main>
 
-    <!-- Footer - bez odstępu od main -->
+    <!-- Footer -->
     <AppFooter class="mt-0" />
   </div>
 </template>
 
 <style>
-/* Style globalne */
+/* Globalna blokada poziomego przewijania */
+html,
 body {
   background-color: #f0f9ff;
   font-family: 'Inter', sans-serif;
@@ -29,9 +30,15 @@ body {
   padding: 0;
 }
 
-/* Usunięcie domyślnych marginów */
+/* Zapobiegaj poziomemu przewijaniu na wszystkich elementach */
 * {
   margin-block-end: 0;
   margin-block-start: 0;
+  box-sizing: border-box;
+}
+
+/* Dodatkowa kontrola szerokości */
+body {
+  max-width: 100vw;
 }
 </style>
