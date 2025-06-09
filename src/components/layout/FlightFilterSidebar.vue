@@ -1,30 +1,73 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 
-// Właściwości filtra
-const props = defineProps({
-  minPrice: { type: Number, required: true },
-  maxPrice: { type: Number, required: true },
-  maxDuration: { type: Number, required: true },
-})
+interface Props {
+  filters: {
+    priceRange: [number, number]
+    durationMax: number
+    stops: {
+      direct: boolean
+      oneStop: boolean
+      multiStop: boolean
+    }
+    airlines: string[]
+  }
+}
 
-const priceRange = ref([props.minPrice, props.maxPrice])
-const durationRange = ref(props.maxDuration)
+const props = defineProps<Props>()
+const emit = defineEmits(['update:filters'])
 
-const stopFilters = ref({
-  direct: true,
-  oneStop: true,
-  multiStop: true,
-})
+// Lokalny stan filtrów
+const localFilters = ref({ ...props.filters })
 
-// Docelowo zrobić dynamiczne
-const airlines = ref([
-  { name: 'LOT Polish Airlines', code: 'LO', checked: true },
-  { name: 'Ryanair', code: 'FR', checked: true },
-  { name: 'Wizz Air', code: 'W6', checked: true },
-  { name: 'Lufthansa', code: 'LH', checked: true },
-  { name: 'KLM', code: 'KL', checked: true },
-])
+// Obserwuj zmiany w propsach
+watch(
+  () => props.filters,
+  (newFilters) => {
+    localFilters.value = { ...newFilters }
+  },
+  { deep: true }
+)
+
+// Obserwuj zmiany w lokalnych filtrach
+watch(
+  localFilters,
+  (newFilters) => {
+    emit('update:filters', { ...newFilters })
+  },
+  { deep: true }
+)
+
+// Obsługa zmiany zakresu cen
+const handlePriceChange = (value: [number, number]) => {
+  localFilters.value.priceRange = value
+}
+
+// Obsługa zmiany maksymalnego czasu trwania
+const handleDurationChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const value = parseInt(target.value)
+  localFilters.value.durationMax = value
+}
+
+// Obsługa zmiany filtrów przesiadek
+const handleStopsChange = (type: 'direct' | 'oneStop' | 'multiStop', value: boolean) => {
+  localFilters.value.stops[type] = value
+}
+
+// Obsługa zmiany filtrów linii lotniczych
+const handleAirlinesChange = (airline: string, event: Event) => {
+  const target = event.target as HTMLInputElement
+  const value = target.checked
+  if (value) {
+    localFilters.value.airlines.push(airline)
+  } else {
+    const index = localFilters.value.airlines.indexOf(airline)
+    if (index > -1) {
+      localFilters.value.airlines.splice(index, 1)
+    }
+  }
+}
 
 // Formatowanie czasu
 const formatDuration = (minutes: number) => {
@@ -40,10 +83,8 @@ const formatPrice = (price: number) => {
 
 // Wybrane linie
 const selectedAirlines = computed(() => {
-  return airlines.value.filter((airline) => airline.checked).map((airline) => airline.code)
+  return localFilters.value.airlines
 })
-
-const emit = defineEmits(['filter-change'])
 
 // Debounced emit dla wydajności - opóźniona emisja filtrów
 let emitTimeout: ReturnType<typeof setTimeout> | null = null
@@ -56,43 +97,13 @@ const emitFilterChange = () => {
 
   // Ustaw nowy timeout - emit po 100ms bez zmian
   emitTimeout = setTimeout(() => {
-    emit('filter-change', {
-      priceRange: priceRange.value,
-      durationMax: durationRange.value,
-      stops: {
-        direct: stopFilters.value.direct,
-        oneStop: stopFilters.value.oneStop,
-        multiStop: stopFilters.value.multiStop,
-      },
-      airlines: selectedAirlines.value,
-    })
+    emit('update:filters', { ...localFilters.value })
   }, 100)
 }
 
 // Natychmiastowa aktualizacja UI
 const watchFilters = () => {
   emitFilterChange()
-}
-
-// Obsługa suwaka czasu
-const updateDuration = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const newValue = parseInt(target.value)
-
-  // Natychmiastowa aktualizacja wartości dla responsywności UI
-  durationRange.value = newValue
-
-  // Natymiastowy emit bez debounce dla suwaka czasu
-  emit('filter-change', {
-    priceRange: priceRange.value,
-    durationMax: durationRange.value,
-    stops: {
-      direct: stopFilters.value.direct,
-      oneStop: stopFilters.value.oneStop,
-      multiStop: stopFilters.value.multiStop,
-    },
-    airlines: selectedAirlines.value,
-  })
 }
 
 // Stan aktywnego suwaka (tylko dla suwaka ceny)
@@ -131,20 +142,20 @@ const updatePrice = (event: Event) => {
 
   // Natychmiastowa aktualizacja bez walidacji dla płynności
   if (activeSlider.value === 'min') {
-    if (newValue <= priceRange.value[1]) {
-      priceRange.value[0] = newValue
+    if (newValue <= localFilters.value.priceRange[1]) {
+      localFilters.value.priceRange[0] = newValue
     } else {
       // Pozwól na przeciągnięcie przez max
-      priceRange.value[0] = newValue
-      priceRange.value[1] = newValue
+      localFilters.value.priceRange[0] = newValue
+      localFilters.value.priceRange[1] = newValue
     }
   } else if (activeSlider.value === 'max') {
-    if (newValue >= priceRange.value[0]) {
-      priceRange.value[1] = newValue
+    if (newValue >= localFilters.value.priceRange[0]) {
+      localFilters.value.priceRange[1] = newValue
     } else {
       // Pozwól na przeciągnięcie przez min
-      priceRange.value[1] = newValue
-      priceRange.value[0] = newValue
+      localFilters.value.priceRange[1] = newValue
+      localFilters.value.priceRange[0] = newValue
     }
   }
 
@@ -153,9 +164,9 @@ const updatePrice = (event: Event) => {
 
 // Metody dla wyświetlania suwaka zakresu
 const getPriceThumbPosition = (index: number) => {
-  const range = props.maxPrice - props.minPrice
+  const range = localFilters.value.priceRange[1] - localFilters.value.priceRange[0]
   if (range === 0) return 0
-  const value = priceRange.value[index] - props.minPrice
+  const value = localFilters.value.priceRange[index] - localFilters.value.priceRange[0]
   return (value / range) * 100
 }
 
@@ -171,9 +182,9 @@ const getPriceRangeStyle = () => {
 
 // funkcja dla pozycji suwaka czasu 
 const getDurationThumbPosition = () => {
-  const range = props.maxDuration - 60
+  const range = localFilters.value.durationMax - 60
   if (range === 0) return 0
-  const value = durationRange.value - 60
+  const value = localFilters.value.durationMax - 60
   return (value / range) * 100
 }
 
@@ -215,9 +226,9 @@ const getDurationThumbStyle = () => {
 
 // Reaktywny watch na zmiany props
 watch(
-  () => [props.minPrice, props.maxPrice],
+  () => [localFilters.value.priceRange[0], localFilters.value.priceRange[1]],
   () => {
-    priceRange.value = [props.minPrice, props.maxPrice]
+    localFilters.value.priceRange = [localFilters.value.priceRange[0], localFilters.value.priceRange[1]]
   },
   { immediate: true },
 )
@@ -261,14 +272,14 @@ onBeforeUnmount(() => {
               class="bg-white px-3 py-1.5 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
               <span class="text-sm font-semibold text-primary-700">{{
-                formatPrice(priceRange[0])
+                formatPrice(localFilters.priceRange[0])
               }}</span>
             </div>
             <div
               class="bg-white px-3 py-1.5 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
               <span class="text-sm font-semibold text-primary-700">{{
-                formatPrice(priceRange[1])
+                formatPrice(localFilters.priceRange[1])
               }}</span>
             </div>
           </div>
@@ -276,7 +287,7 @@ onBeforeUnmount(() => {
           <!-- Suwak ceny -->
           <div class="relative h-2 bg-gray-200 rounded-full mb-6 price-slider-container">
             <div class="sr-only">
-              Zakres ceny od {{ formatPrice(priceRange[0]) }} do {{ formatPrice(priceRange[1]) }}
+              Zakres ceny od {{ formatPrice(localFilters.priceRange[0]) }} do {{ formatPrice(localFilters.priceRange[1]) }}
             </div>
 
             <!-- Zaznaczenie zakresu z ulepszonym gradientem -->
@@ -303,9 +314,9 @@ onBeforeUnmount(() => {
             <!-- Input suwaka -->
             <input
               type="range"
-              :min="minPrice"
-              :max="maxPrice"
-              :value="activeSlider === 'max' ? priceRange[1] : priceRange[0]"
+              :min="localFilters.priceRange[0]"
+              :max="localFilters.priceRange[1]"
+              :value="activeSlider === 'max' ? localFilters.priceRange[1] : localFilters.priceRange[0]"
               @mousedown="handleSliderInteraction"
               @touchstart="handleSliderInteraction"
               @input="updatePrice"
@@ -346,8 +357,8 @@ onBeforeUnmount(() => {
               <div class="flex items-center ml-4">
                 <input
                   type="checkbox"
-                  v-model="stopFilters.direct"
-                  @change="watchFilters"
+                  v-model="localFilters.stops.direct"
+                  @change="handleStopsChange('direct', localFilters.stops.direct)"
                   class="sr-only"
                   id="stopFilterDirect"
                   aria-label="Bez przesiadek"
@@ -355,7 +366,7 @@ onBeforeUnmount(() => {
                 <div
                   class="relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-all duration-300 shadow-sm ring-1"
                   :class="
-                    stopFilters.direct
+                    localFilters.stops.direct
                       ? 'bg-primary-500 shadow-primary-200 ring-primary-300'
                       : 'bg-gray-200 hover:bg-gray-300 ring-gray-300'
                   "
@@ -363,7 +374,7 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      stopFilters.direct ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.direct ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -385,8 +396,8 @@ onBeforeUnmount(() => {
               <div class="flex items-center ml-4">
                 <input
                   type="checkbox"
-                  v-model="stopFilters.oneStop"
-                  @change="watchFilters"
+                  v-model="localFilters.stops.oneStop"
+                  @change="handleStopsChange('oneStop', localFilters.stops.oneStop)"
                   class="sr-only"
                   id="stopFilterOneStop"
                   aria-label="1 przesiadka"
@@ -394,7 +405,7 @@ onBeforeUnmount(() => {
                 <div
                   class="relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-all duration-300 shadow-sm ring-1"
                   :class="
-                    stopFilters.oneStop
+                    localFilters.stops.oneStop
                       ? 'bg-primary-500 shadow-primary-200 ring-primary-300'
                       : 'bg-gray-200 hover:bg-gray-300 ring-gray-300'
                   "
@@ -402,7 +413,7 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      stopFilters.oneStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.oneStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -424,8 +435,8 @@ onBeforeUnmount(() => {
               <div class="flex items-center ml-4">
                 <input
                   type="checkbox"
-                  v-model="stopFilters.multiStop"
-                  @change="watchFilters"
+                  v-model="localFilters.stops.multiStop"
+                  @change="handleStopsChange('multiStop', localFilters.stops.multiStop)"
                   class="sr-only"
                   id="stopFilterMultiStop"
                   aria-label="2+ przesiadki"
@@ -433,7 +444,7 @@ onBeforeUnmount(() => {
                 <div
                   class="relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-all duration-300 shadow-sm ring-1"
                   :class="
-                    stopFilters.multiStop
+                    localFilters.stops.multiStop
                       ? 'bg-primary-500 shadow-primary-200 ring-primary-300'
                       : 'bg-gray-200 hover:bg-gray-300 ring-gray-300'
                   "
@@ -441,7 +452,7 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      stopFilters.multiStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.multiStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -469,7 +480,7 @@ onBeforeUnmount(() => {
               class="bg-white px-4 py-2 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
               <span class="text-sm font-semibold text-primary-700"
-                >Do {{ formatDuration(durationRange) }}</span
+                >Do {{ formatDuration(localFilters.durationMax) }}</span
               >
             </div>
           </div>
@@ -482,7 +493,7 @@ onBeforeUnmount(() => {
             <!-- Skala czasu -->
             <div class="absolute -bottom-5 left-0 right-0 flex justify-between">
               <span class="text-xs text-gray-500">{{ formatDuration(60) }}</span>
-              <span class="text-xs text-gray-500">{{ formatDuration(maxDuration) }}</span>
+              <span class="text-xs text-gray-500">{{ formatDuration(localFilters.durationMax) }}</span>
             </div>
 
             <!-- Kciuk suwaka -->
@@ -495,9 +506,9 @@ onBeforeUnmount(() => {
             <input
               type="range"
               :min="60"
-              :max="maxDuration"
-              :value="durationRange"
-              @input="updateDuration"
+              :max="localFilters.durationMax"
+              :value="localFilters.durationMax"
+              @input="handleDurationChange"
               class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer duration-range-input"
               aria-label="Maksymalny czas podróży"
             />
@@ -526,10 +537,10 @@ onBeforeUnmount(() => {
         >
           <div class="space-y-3">
             <label
-              v-for="airline in airlines"
-              :key="airline.code"
+              v-for="airline in localFilters.airlines"
+              :key="airline"
               class="flex items-center cursor-pointer group p-3 rounded-lg transition-all hover:bg-white hover:shadow-sm hover:border-primary-200 border border-transparent"
-              :for="`airline-${airline.code}`"
+              :for="`airline-${airline}`"
             >
               <div class="flex items-center space-x-3 flex-1 min-w-0">
                 <div class="flex-shrink-0 w-5 flex justify-center">
@@ -539,39 +550,38 @@ onBeforeUnmount(() => {
                   <span
                     class="text-gray-800 font-medium text-sm leading-tight group-hover:text-primary-700"
                   >
-                    {{ airline.name }}
+                    {{ airline }}
                   </span>
-                  <span class="text-xs text-gray-500 mt-0.5">({{ airline.code }})</span>
                 </div>
               </div>
 
               <div class="flex items-center ml-4">
                 <input
                   type="checkbox"
-                  v-model="airline.checked"
-                  @change="watchFilters"
+                  :checked="localFilters.airlines.includes(airline)"
+                  @change="(e) => handleAirlinesChange(airline, e)"
                   class="sr-only"
-                  :id="`airline-${airline.code}`"
-                  :aria-label="airline.name"
+                  :id="`airline-${airline}`"
+                  :aria-label="airline"
                 />
                 <div
                   class="relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-all duration-300 shadow-sm ring-1"
                   :class="
-                    airline.checked
+                    localFilters.airlines.includes(airline)
                       ? 'bg-primary-500 shadow-primary-200 ring-primary-300'
                       : 'bg-gray-200 hover:bg-gray-300 ring-gray-300'
                   "
                 >
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
-                    :class="airline.checked ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'"
+                    :class="localFilters.airlines.includes(airline) ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'"
                   ></span>
                 </div>
               </div>
             </label>
           </div>
 
-          <div v-if="airlines.length === 0" class="text-center text-gray-500 py-4">
+          <div v-if="localFilters.airlines.length === 0" class="text-center text-gray-500 py-4">
             <span class="text-sm">Brak dostępnych linii lotniczych</span>
           </div>
         </div>

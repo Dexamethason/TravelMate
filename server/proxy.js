@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const Amadeus = require('@amadeus/amadeus');
+const Amadeus = require('amadeus');
 const dotenv = require('dotenv');
 
 // ładowanie zmiennych z .env   
@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3001;
 //  middleware
 app.use(express.json());
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: true,
   methods: ['GET', 'POST'],
   credentials: true
 }));
@@ -78,7 +78,7 @@ app.get('/api/flights/search', async (req, res) => {
     console.log('Wyszukiwanie lotów z parametrami:', searchParams);
 
     // Wywołanie API Amadeus
-    const response = await amadeus.shopping.flightOffers.get(searchParams);
+    const response = await amadeus.shopping.flightOffersSearch.get(searchParams);
 
     // Zwróć surowe dane odpowiedzi
     res.json({
