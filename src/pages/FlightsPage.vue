@@ -70,6 +70,85 @@ const durationToMinutes = (duration: string) => {
   return parseInt(hours) * 60 + parseInt(minutes)
 }
 
+// Dodaję funkcję do parsowania ISO 8601 duration format (PT2H30M)
+const parseISO8601Duration = (duration: string): string => {
+  if (!duration) return '0h 0m'
+  
+  // Regex dla formatu PT[H]H[M]M lub PT[M]M
+  const regex = /PT(?:(\d+)H)?(?:(\d+)M)?/
+  const matches = duration.match(regex)
+  
+  if (!matches) return '0h 0m'
+  
+  const hours = parseInt(matches[1] || '0')
+  const minutes = parseInt(matches[2] || '0')
+  
+  return `${hours}h ${minutes}m`
+}
+
+// Funkcja do mapowania kodów linii lotniczych na pełne nazwy
+const getAirlineName = (carrierCode: string): string => {
+  const airlineMap: Record<string, string> = {
+    'LO': 'LOT Polish Airlines',
+    'FR': 'Ryanair',
+    'LH': 'Lufthansa',
+    'W6': 'Wizz Air',
+    'KL': 'KLM',
+    'AF': 'Air France',
+    'U2': 'EasyJet',
+    'LX': 'Swiss International Air Lines',
+    'BA': 'British Airways',
+    'IB': 'Iberia',
+    'VY': 'Vueling',
+    'OS': 'Austrian Airlines',
+    'SN': 'Brussels Airlines',
+    'AZ': 'ITA Airways',
+    'SK': 'SAS',
+    'DL': 'Delta Air Lines',
+    'AA': 'American Airlines',
+    'UA': 'United Airlines',
+    'EW': 'Eurowings',
+    '4U': 'Germanwings',
+    'TP': 'TAP Air Portugal',
+    'DY': 'Norwegian',
+    'WF': 'Widerøe',
+    'TK': 'Turkish Airlines',
+    'QR': 'Qatar Airways',
+    'EK': 'Emirates',
+    'MS': 'EgyptAir',
+    'ET': 'Ethiopian Airlines',
+    'SA': 'South African Airways',
+    'EY': 'Etihad Airways',
+    'SV': 'Saudi Arabian Airlines',
+    'AI': 'Air India',
+    'NH': 'ANA',
+    'JL': 'Japan Airlines',
+    'CX': 'Cathay Pacific',
+    'SQ': 'Singapore Airlines',
+    'TG': 'Thai Airways',
+    'MH': 'Malaysia Airlines',
+    'GA': 'Garuda Indonesia',
+    'AC': 'Air Canada',
+    'WS': 'WestJet',
+    'AM': 'Aeroméxico',
+    'CM': 'Copa Airlines',
+    'LA': 'LATAM Airlines',
+    'AR': 'Aerolíneas Argentinas',
+    'AV': 'Avianca',
+    'JJ': 'TAM Airlines',
+    'G3': 'Gol Linhas Aéreas',
+    'AD': 'Azul Brazilian Airlines',
+    'QF': 'Qantas',
+    'JQ': 'Jetstar Airways',
+    'VA': 'Virgin Australia',
+    'NZ': 'Air New Zealand',
+    'FJ': 'Fiji Airways',
+    'PX': 'Air Niugini'
+  }
+  
+  return airlineMap[carrierCode] || carrierCode
+}
+
 // Obliczone loty z zastosowanymi filtrami i sortowaniem
 const filteredFlights = computed(() => {
   if (!hasSearched.value) return []
@@ -157,7 +236,7 @@ const handleSearch = async (params: any) => {
 
       return {
         id: offer.id,
-        airline: segment.carrierCode,
+        airline: getAirlineName(segment.carrierCode),
         airlineCode: segment.carrierCode,
         airlineLogo: `/src/assets/mock/airlines/${segment.carrierCode.toLowerCase()}.png`,
         departureCity: segment.departure.iataCode,
@@ -170,7 +249,7 @@ const handleSearch = async (params: any) => {
         arrivalAirportCode: segment.arrival.iataCode,
         arrivalTime: segment.arrival.at.split('T')[1].substring(0, 5),
         arrivalDate: segment.arrival.at.split('T')[0],
-        duration: `${Math.floor(itinerary.duration / 60)}h ${itinerary.duration % 60}m`,
+        duration: parseISO8601Duration(itinerary.duration),
         stops: itinerary.segments.length - 1,
         stopLocations: itinerary.segments.slice(1).map((s: any) => `${s.departure.iataCode}`),
         price: parseFloat(price),
