@@ -61,7 +61,8 @@ onMounted(() => {
 
   // Ustaw początkowe linie lotnicze
   const uniqueAirlines = [...new Set(allFlights.value.map((flight) => flight.airlineCode))]
-  filters.value.airlines = uniqueAirlines as string[]
+  filters.value.airlines = []
+  filters.value.availableAirlines = uniqueAirlines
 })
 
 // Konwertuj string czasu trwania na minuty do filtrowania
@@ -73,79 +74,79 @@ const durationToMinutes = (duration: string) => {
 // Dodaję funkcję do parsowania ISO 8601 duration format (PT2H30M)
 const parseISO8601Duration = (duration: string): string => {
   if (!duration) return '0h 0m'
-  
+
   // Regex dla formatu PT[H]H[M]M lub PT[M]M
   const regex = /PT(?:(\d+)H)?(?:(\d+)M)?/
   const matches = duration.match(regex)
-  
+
   if (!matches) return '0h 0m'
-  
+
   const hours = parseInt(matches[1] || '0')
   const minutes = parseInt(matches[2] || '0')
-  
+
   return `${hours}h ${minutes}m`
 }
 
 // Funkcja do mapowania kodów linii lotniczych na pełne nazwy
 const getAirlineName = (carrierCode: string): string => {
   const airlineMap: Record<string, string> = {
-    'LO': 'LOT Polish Airlines',
-    'FR': 'Ryanair',
-    'LH': 'Lufthansa',
-    'W6': 'Wizz Air',
-    'KL': 'KLM',
-    'AF': 'Air France',
-    'U2': 'EasyJet',
-    'LX': 'Swiss International Air Lines',
-    'BA': 'British Airways',
-    'IB': 'Iberia',
-    'VY': 'Vueling',
-    'OS': 'Austrian Airlines',
-    'SN': 'Brussels Airlines',
-    'AZ': 'ITA Airways',
-    'SK': 'SAS',
-    'DL': 'Delta Air Lines',
-    'AA': 'American Airlines',
-    'UA': 'United Airlines',
-    'EW': 'Eurowings',
+    LO: 'LOT Polish Airlines',
+    FR: 'Ryanair',
+    LH: 'Lufthansa',
+    W6: 'Wizz Air',
+    KL: 'KLM',
+    AF: 'Air France',
+    U2: 'EasyJet',
+    LX: 'Swiss International Air Lines',
+    BA: 'British Airways',
+    IB: 'Iberia',
+    VY: 'Vueling',
+    OS: 'Austrian Airlines',
+    SN: 'Brussels Airlines',
+    AZ: 'ITA Airways',
+    SK: 'SAS',
+    DL: 'Delta Air Lines',
+    AA: 'American Airlines',
+    UA: 'United Airlines',
+    EW: 'Eurowings',
     '4U': 'Germanwings',
-    'TP': 'TAP Air Portugal',
-    'DY': 'Norwegian',
-    'WF': 'Widerøe',
-    'TK': 'Turkish Airlines',
-    'QR': 'Qatar Airways',
-    'EK': 'Emirates',
-    'MS': 'EgyptAir',
-    'ET': 'Ethiopian Airlines',
-    'SA': 'South African Airways',
-    'EY': 'Etihad Airways',
-    'SV': 'Saudi Arabian Airlines',
-    'AI': 'Air India',
-    'NH': 'ANA',
-    'JL': 'Japan Airlines',
-    'CX': 'Cathay Pacific',
-    'SQ': 'Singapore Airlines',
-    'TG': 'Thai Airways',
-    'MH': 'Malaysia Airlines',
-    'GA': 'Garuda Indonesia',
-    'AC': 'Air Canada',
-    'WS': 'WestJet',
-    'AM': 'Aeroméxico',
-    'CM': 'Copa Airlines',
-    'LA': 'LATAM Airlines',
-    'AR': 'Aerolíneas Argentinas',
-    'AV': 'Avianca',
-    'JJ': 'TAM Airlines',
-    'G3': 'Gol Linhas Aéreas',
-    'AD': 'Azul Brazilian Airlines',
-    'QF': 'Qantas',
-    'JQ': 'Jetstar Airways',
-    'VA': 'Virgin Australia',
-    'NZ': 'Air New Zealand',
-    'FJ': 'Fiji Airways',
-    'PX': 'Air Niugini'
+    TP: 'TAP Air Portugal',
+    DY: 'Norwegian',
+    WF: 'Widerøe',
+    TK: 'Turkish Airlines',
+    QR: 'Qatar Airways',
+    EK: 'Emirates',
+    MS: 'EgyptAir',
+    ET: 'Ethiopian Airlines',
+    SA: 'South African Airways',
+    EY: 'Etihad Airways',
+    SV: 'Saudi Arabian Airlines',
+    AI: 'Air India',
+    NH: 'ANA',
+    JL: 'Japan Airlines',
+    CX: 'Cathay Pacific',
+    SQ: 'Singapore Airlines',
+    TG: 'Thai Airways',
+    MH: 'Malaysia Airlines',
+    GA: 'Garuda Indonesia',
+    AC: 'Air Canada',
+    WS: 'WestJet',
+    AM: 'Aeroméxico',
+    CM: 'Copa Airlines',
+    LA: 'LATAM Airlines',
+    AR: 'Aerolíneas Argentinas',
+    AV: 'Avianca',
+    JJ: 'TAM Airlines',
+    G3: 'Gol Linhas Aéreas',
+    AD: 'Azul Brazilian Airlines',
+    QF: 'Qantas',
+    JQ: 'Jetstar Airways',
+    VA: 'Virgin Australia',
+    NZ: 'Air New Zealand',
+    FJ: 'Fiji Airways',
+    PX: 'Air Niugini',
   }
-  
+
   return airlineMap[carrierCode] || carrierCode
 }
 
@@ -169,10 +170,7 @@ const filteredFlights = computed(() => {
     if (durationMinutes > filters.value.durationMax) return false
 
     // Filtr linii lotniczych
-    if (
-      filters.value.airlines.length > 0 &&
-      !(filters.value.airlines as string[]).includes(flight.airlineCode)
-    ) {
+    if (filters.value.airlines.includes(flight.airlineCode)) {
       return false
     }
 
@@ -221,46 +219,44 @@ const handleSearch = async (params: any) => {
       destination: destinationCode,
       departureDate: params.departDate,
       returnDate: params.returnDate,
-      adults: params.passengers
+      adults: params.passengers,
     })
 
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Nie udało się pobrać danych o lotach')
     }
 
-    // Konwertuj odpowiedź z API Amadeus na format używany w aplikacji
     allFlights.value = response.data.map((offer: any) => {
       const itinerary = offer.itineraries[0]
       const segment = itinerary.segments[0]
-      const price = offer.price.total
+      const arrivalSegment = itinerary.segments[itinerary.segments.length - 1]
+
+      const originalPrice = parseFloat(offer.price.total)
 
       return {
         id: offer.id,
         airline: getAirlineName(segment.carrierCode),
         airlineCode: segment.carrierCode,
-        airlineLogo: `/src/assets/mock/airlines/${segment.carrierCode.toLowerCase()}.png`,
-        departureCity: segment.departure.iataCode,
-        departureAirport: segment.departure.iataCode,
-        departureAirportCode: segment.departure.iataCode,
         departureTime: segment.departure.at.split('T')[1].substring(0, 5),
+        arrivalTime: arrivalSegment.arrival.at.split('T')[1].substring(0, 5),
+        departureAirport: segment.departure.iataCode,
+        arrivalAirport: arrivalSegment.arrival.iataCode,
+        departureAirportCode: segment.departure.iataCode,
+        arrivalAirportCode: arrivalSegment.arrival.iataCode,
         departureDate: segment.departure.at.split('T')[0],
-        arrivalCity: segment.arrival.iataCode,
-        arrivalAirport: segment.arrival.iataCode,
-        arrivalAirportCode: segment.arrival.iataCode,
-        arrivalTime: segment.arrival.at.split('T')[1].substring(0, 5),
-        arrivalDate: segment.arrival.at.split('T')[0],
+        arrivalDate: arrivalSegment.arrival.at.split('T')[0],
         duration: parseISO8601Duration(itinerary.duration),
         stops: itinerary.segments.length - 1,
         stopLocations: itinerary.segments.slice(1).map((s: any) => `${s.departure.iataCode}`),
-        price: parseFloat(price),
-        currency: offer.price.currency
+        price: originalPrice,
+        currency: offer.price.currency,
+        originalPriceEUR: originalPrice,
       }
     })
 
-    // Ustaw początkowy zakres cen
     const prices = allFlights.value.map((flight) => flight.price)
     const minPrice = Math.min(...prices)
-    const maxPrice = Math.max(...prices)
+    const maxPrice = Math.max(...prices) + 1 // +1 bo czasem nie łapało dobrze ostatniego lotu
     filters.value.priceRange = [minPrice, maxPrice]
 
     // Ustaw początkowy maksymalny czas trwania
@@ -272,7 +268,8 @@ const handleSearch = async (params: any) => {
 
     // Ustaw początkowe linie lotnicze
     const uniqueAirlines = [...new Set(allFlights.value.map((flight) => flight.airlineCode))]
-    filters.value.airlines = uniqueAirlines as string[]
+    filters.value.airlines = []
+    filters.value.availableAirlines = uniqueAirlines
   } catch (err: unknown) {
     console.error('Błąd podczas wyszukiwania lotów:', err)
     error.value = err instanceof Error ? err.message : 'Nie udało się pobrać danych o lotach'
@@ -340,7 +337,11 @@ const handleSelectFlight = (id: string) => {
         <div class="flex">
           <div class="flex-shrink-0">
             <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              <path
+                fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clip-rule="evenodd"
+              />
             </svg>
           </div>
           <div class="ml-3">
@@ -393,16 +394,23 @@ const handleSelectFlight = (id: string) => {
         </div>
 
         <!-- Filters sidebar -->
-        <div
-          id="flight-filters"
-          :class="[
-            'lg:w-1/4',
-            showFilters ? 'block' : 'hidden lg:block'
-          ]"
-        >
+        <div id="flight-filters" :class="['lg:w-1/4', showFilters ? 'block' : 'hidden lg:block']">
           <FlightFilterSidebar
+            v-if="hasSearched"
             :filters="filters"
+            :min-price="allFlights.length > 0 ? Math.min(...allFlights.map((f) => f.price)) : 0"
+            :max-price="
+              allFlights.length > 0 ? Math.max(...allFlights.map((f) => f.price)) + 1 : 1000
+            "
+            :max-duration="
+              allFlights.length > 0
+                ? Math.max(...allFlights.map((f) => durationToMinutes(f.duration)))
+                : 1440
+            "
+            :currency="allFlights.length > 0 ? allFlights[0].currency : 'EUR'"
             @update:filters="handleFilterChange"
+            :class="{ block: showFilters, hidden: !showFilters }"
+            class="lg:block"
           />
         </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 interface Props {
   filters: {
@@ -11,141 +11,93 @@ interface Props {
       multiStop: boolean
     }
     airlines: string[]
+    availableAirlines?: string[]
   }
+  minPrice: number
+  maxPrice: number
+  maxDuration: number
+  currency?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  currency: 'EUR',
+})
 const emit = defineEmits(['update:filters'])
 
-// Lokalny stan filtrów
-const localFilters = ref({ ...props.filters })
-
-// Obserwuj zmiany w propsach
-watch(
-  () => props.filters,
-  (newFilters) => {
-    localFilters.value = { ...newFilters }
-  },
-  { deep: true }
-)
-
-// Obserwuj zmiany w lokalnych filtrach
-watch(
-  localFilters,
-  (newFilters) => {
-    emit('update:filters', { ...newFilters })
-  },
-  { deep: true }
-)
-
-// Obsługa zmiany zakresu cen
-const handlePriceChange = (value: [number, number]) => {
-  localFilters.value.priceRange = value
-}
-
-// Obsługa zmiany maksymalnego czasu trwania
-const handleDurationChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const value = parseInt(target.value)
-  localFilters.value.durationMax = value
-}
-
-// Obsługa zmiany filtrów przesiadek
-const handleStopsChange = (type: 'direct' | 'oneStop' | 'multiStop', value: boolean) => {
-  localFilters.value.stops[type] = value
-}
-
-// Obsługa zmiany filtrów linii lotniczych
-const handleAirlinesChange = (airline: string, event: Event) => {
-  const target = event.target as HTMLInputElement
-  const value = target.checked
-  if (value) {
-    localFilters.value.airlines.push(airline)
-  } else {
-    const index = localFilters.value.airlines.indexOf(airline)
-    if (index > -1) {
-      localFilters.value.airlines.splice(index, 1)
-    }
-  }
-}
-
-// Formatowanie czasu
-const formatDuration = (minutes: number) => {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${hours}h ${mins}m`
-}
-
-// Formatowanie ceny
-const formatPrice = (price: number) => {
-  return `${price} PLN`
-}
-
-// Wybrane linie
-const selectedAirlines = computed(() => {
-  return localFilters.value.airlines
+// Lokalny stan filtrów z reactive refs
+const localFilters = ref({
+  priceRange: [...props.filters.priceRange] as [number, number],
+  durationMax: props.filters.durationMax,
+  stops: { ...props.filters.stops },
+  airlines: [...props.filters.airlines],
 })
 
-// Debounced emit dla wydajności - opóźniona emisja filtrów
+let isUpdatingFromProps = false
+
+watch(
+  () => props.filters,
+  async (newFilters) => {
+    if (isUpdatingFromProps) return
+
+    isUpdatingFromProps = true
+    localFilters.value = {
+      priceRange: [...newFilters.priceRange] as [number, number],
+      durationMax: newFilters.durationMax,
+      stops: { ...newFilters.stops },
+      airlines: [...newFilters.airlines],
+    }
+
+    await nextTick()
+    isUpdatingFromProps = false
+  },
+  { deep: true },
+)
 let emitTimeout: ReturnType<typeof setTimeout> | null = null
+let isEmitting = false
 
 const emitFilterChange = () => {
-  // Anuluj poprzedni timeout
+  if (isEmitting || isUpdatingFromProps) return
+
   if (emitTimeout) {
     clearTimeout(emitTimeout)
   }
 
-  // Ustaw nowy timeout - emit po 100ms bez zmian
   emitTimeout = setTimeout(() => {
-    emit('update:filters', { ...localFilters.value })
-  }, 100)
+    if (!isUpdatingFromProps) {
+      isEmitting = true
+      emit('update:filters', {
+        priceRange: [...localFilters.value.priceRange] as [number, number],
+        durationMax: localFilters.value.durationMax,
+        stops: { ...localFilters.value.stops },
+        airlines: [...localFilters.value.airlines],
+      })
+      isEmitting = false
+    }
+  }, 150)
 }
 
-// Natychmiastowa aktualizacja UI
-const watchFilters = () => {
-  emitFilterChange()
-}
+const handleDurationChange = (event: Event) => {
+  if (isUpdatingFromProps) return
 
-// Stan aktywnego suwaka (tylko dla suwaka ceny)
-const activeSlider = ref<'min' | 'max' | null>(null)
-
-// Poprawione metody dla suwaka ceny - z wykrywaniem pozycji kliknięcia
-const handleSliderInteraction = (event: MouseEvent | TouchEvent) => {
-  const slider = event.currentTarget as HTMLElement
-  const rect = slider.getBoundingClientRect()
-
-  // Oblicz pozycję kliknięcia jako procent
-  let clientX: number
-  if (event instanceof MouseEvent) {
-    clientX = event.clientX
-  } else {
-    clientX = event.touches[0].clientX
-  }
-
-  const clickPosition = (clientX - rect.left) / rect.width
-
-  // Oblicz pozycje kciuków jako procenty
-  const minPosition = getPriceThumbPosition(0) / 100
-  const maxPosition = getPriceThumbPosition(1) / 100
-
-  // Określ, który suwak jest bliżej
-  const distanceToMin = Math.abs(clickPosition - minPosition)
-  const distanceToMax = Math.abs(clickPosition - maxPosition)
-
-  activeSlider.value = distanceToMin < distanceToMax ? 'min' : 'max'
-}
-
-// Uniwersalna funkcja do aktualizacji ceny
-const updatePrice = (event: Event) => {
   const target = event.target as HTMLInputElement
   const newValue = parseInt(target.value)
 
-  // Natychmiastowa aktualizacja bez walidacji dla płynności
+  if (!isNaN(newValue) && newValue !== localFilters.value.durationMax) {
+    localFilters.value.durationMax = newValue
+    emitFilterChange()
+  }
+}
+
+const updatePrice = (event: Event) => {
+  if (isUpdatingFromProps) return
+
+  const target = event.target as HTMLInputElement
+  const newValue = parseInt(target.value)
+
   if (activeSlider.value === 'min') {
     if (newValue <= localFilters.value.priceRange[1]) {
       localFilters.value.priceRange[0] = newValue
     } else {
-      // Pozwól na przeciągnięcie przez max
       localFilters.value.priceRange[0] = newValue
       localFilters.value.priceRange[1] = newValue
     }
@@ -153,23 +105,83 @@ const updatePrice = (event: Event) => {
     if (newValue >= localFilters.value.priceRange[0]) {
       localFilters.value.priceRange[1] = newValue
     } else {
-      // Pozwól na przeciągnięcie przez min
       localFilters.value.priceRange[1] = newValue
       localFilters.value.priceRange[0] = newValue
     }
   }
 
-  watchFilters()
+  emitFilterChange()
 }
 
-// Metody dla wyświetlania suwaka zakresu
+const handleStopsChange = (type: 'direct' | 'oneStop' | 'multiStop', value: boolean) => {
+  if (isUpdatingFromProps) return
+
+  localFilters.value.stops[type] = value
+  emitFilterChange()
+}
+
+const handleAirlinesChange = (airline: string, event: Event) => {
+  if (isUpdatingFromProps) return
+
+  const target = event.target as HTMLInputElement
+  const isChecked = target.checked
+
+  const currentAirlines = [...localFilters.value.airlines]
+
+  if (isChecked) {
+    const index = currentAirlines.indexOf(airline)
+    if (index > -1) {
+      currentAirlines.splice(index, 1)
+    }
+  } else {
+    if (!currentAirlines.includes(airline)) {
+      currentAirlines.push(airline)
+    }
+  }
+
+  localFilters.value.airlines = currentAirlines
+  emitFilterChange()
+}
+
+// Formatowanie bez side effects
+const formatDuration = (minutes: number) => {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `${hours}h ${mins}m`
+}
+
+// formatowanie ceny używa waluty z props
+const formatPrice = (price: number) => {
+  return `${price.toFixed(2)} ${props.currency}`
+}
+
+// computed properties - eliminuje proxy errors
+const selectedAirlines = computed(() => {
+  return [...localFilters.value.airlines]
+})
+
+// Stan aktywnego suwaka
+const activeSlider = ref<'min' | 'max' | null>(null)
+
 const getPriceThumbPosition = (index: number) => {
-  const range = localFilters.value.priceRange[1] - localFilters.value.priceRange[0]
-  if (range === 0) return 0
-  const value = localFilters.value.priceRange[index] - localFilters.value.priceRange[0]
+  const minRange = props.minPrice
+  const maxRange = props.maxPrice
+  const range = maxRange - minRange
+  if (range === 0) return index === 0 ? 0 : 100
+  const value = localFilters.value.priceRange[index] - minRange
   return (value / range) * 100
 }
 
+const getDurationThumbPosition = () => {
+  const minRange = 60
+  const maxRange = props.maxDuration
+  const range = maxRange - minRange
+  if (range === 0) return 0
+  const value = localFilters.value.durationMax - minRange
+  return (value / range) * 100
+}
+
+// Funkcje stylu bez reactive dependencies
 const getPriceRangeStyle = () => {
   const start = getPriceThumbPosition(0)
   const end = getPriceThumbPosition(1)
@@ -180,15 +192,6 @@ const getPriceRangeStyle = () => {
   }
 }
 
-// funkcja dla pozycji suwaka czasu 
-const getDurationThumbPosition = () => {
-  const range = localFilters.value.durationMax - 60
-  if (range === 0) return 0
-  const value = localFilters.value.durationMax - 60
-  return (value / range) * 100
-}
-
-// funkcja dla stylu zakresu czasu
 const getDurationRangeStyle = () => {
   const percentage = getDurationThumbPosition()
   return {
@@ -198,53 +201,99 @@ const getDurationRangeStyle = () => {
   }
 }
 
-// Funkcje dla kciuków suwaka ceny
-const getPriceThumbLeftStyle = () => {
-  return {
-    left: `calc(${getPriceThumbPosition(0)}% - 12px)`,
-    top: '-7px',
-    zIndex: activeSlider.value === 'min' ? 6 : 5,
+const getPriceThumbLeftStyle = () => ({
+  left: `calc(${getPriceThumbPosition(0)}% - 12px)`,
+  top: '-7px',
+  zIndex: activeSlider.value === 'min' ? 6 : 5,
+})
+
+const getPriceThumbRightStyle = () => ({
+  left: `calc(${getPriceThumbPosition(1)}% - 12px)`,
+  top: '-7px',
+  zIndex: activeSlider.value === 'max' ? 6 : 5,
+})
+
+const getDurationThumbStyle = () => ({
+  left: `calc(${getDurationThumbPosition()}% - 12px)`,
+  top: '-7px',
+  zIndex: 5,
+})
+
+// Interakcja z suwakiem ceny
+const handleSliderInteraction = (event: MouseEvent | TouchEvent) => {
+  if (isUpdatingFromProps) return
+
+  const slider = event.currentTarget as HTMLElement
+  const rect = slider.getBoundingClientRect()
+
+  let clientX: number
+  if (event instanceof MouseEvent) {
+    clientX = event.clientX
+  } else {
+    clientX = event.touches[0].clientX
   }
+
+  const clickPosition = (clientX - rect.left) / rect.width
+  const minPosition = getPriceThumbPosition(0) / 100
+  const maxPosition = getPriceThumbPosition(1) / 100
+
+  const distanceToMin = Math.abs(clickPosition - minPosition)
+  const distanceToMax = Math.abs(clickPosition - maxPosition)
+
+  activeSlider.value = distanceToMin < distanceToMax ? 'min' : 'max'
 }
 
-const getPriceThumbRightStyle = () => {
-  return {
-    left: `calc(${getPriceThumbPosition(1)}% - 12px)`,
-    top: '-7px',
-    zIndex: activeSlider.value === 'max' ? 6 : 5,
-  }
-}
-
-// Funkcja dla kciuka czasu
-const getDurationThumbStyle = () => {
-  return {
-    left: `calc(${getDurationThumbPosition()}% - 12px)`,
-    top: '-7px',
-    zIndex: 5,
-  }
-}
-
-// Reaktywny watch na zmiany props
-watch(
-  () => [localFilters.value.priceRange[0], localFilters.value.priceRange[1]],
-  () => {
-    localFilters.value.priceRange = [localFilters.value.priceRange[0], localFilters.value.priceRange[1]]
-  },
-  { immediate: true },
-)
-
-// Reset aktywnego suwaka po zakończeniu interakcji (tylko dla suwaka ceny)
 const resetActiveSlider = () => {
   activeSlider.value = null
 }
 
-// Cleanup timeout przy unmount
+// Cleanup
 import { onBeforeUnmount } from 'vue'
 onBeforeUnmount(() => {
   if (emitTimeout) {
     clearTimeout(emitTimeout)
   }
 })
+
+const availableAirlines = computed(() => {
+  const uniqueAirlines = [...new Set(props.filters.availableAirlines || [])]
+  return uniqueAirlines.length > 0 ? uniqueAirlines : []
+})
+
+// Funkcja do pobierania wyświetlanej nazwy linii lotniczej
+const getAirlineDisplayName = (code: string) => {
+  const airlineMap: Record<string, string> = {
+    LO: 'LOT Polish Airlines',
+    FR: 'Ryanair',
+    LH: 'Lufthansa',
+    W6: 'Wizz Air',
+    KL: 'KLM',
+    AF: 'Air France',
+    U2: 'EasyJet',
+    LX: 'Swiss International Air Lines',
+    BA: 'British Airways',
+    IB: 'Iberia',
+    VY: 'Vueling',
+    OS: 'Austrian Airlines',
+    SN: 'Brussels Airlines',
+    AZ: 'ITA Airways',
+    TK: 'Turkish Airlines',
+    QR: 'Qatar Airways',
+    EK: 'Emirates',
+    AC: 'Air Canada',
+    UA: 'United Airlines',
+    DL: 'Delta Air Lines',
+    AA: 'American Airlines',
+    WF: 'Widerøe',
+    SK: 'SAS Scandinavian Airlines',
+    AY: 'Finnair',
+    BT: 'Air Baltic',
+    TP: 'TAP Air Portugal',
+    EN: 'Air Dolomiti',
+    LG: 'Luxair',
+  }
+  return airlineMap[code] || code
+}
 </script>
 
 <template>
@@ -287,7 +336,8 @@ onBeforeUnmount(() => {
           <!-- Suwak ceny -->
           <div class="relative h-2 bg-gray-200 rounded-full mb-6 price-slider-container">
             <div class="sr-only">
-              Zakres ceny od {{ formatPrice(localFilters.priceRange[0]) }} do {{ formatPrice(localFilters.priceRange[1]) }}
+              Zakres ceny od {{ formatPrice(localFilters.priceRange[0]) }} do
+              {{ formatPrice(localFilters.priceRange[1]) }}
             </div>
 
             <!-- Zaznaczenie zakresu z ulepszonym gradientem -->
@@ -311,12 +361,13 @@ onBeforeUnmount(() => {
               }"
             ></div>
 
-            <!-- Input suwaka -->
             <input
               type="range"
-              :min="localFilters.priceRange[0]"
-              :max="localFilters.priceRange[1]"
-              :value="activeSlider === 'max' ? localFilters.priceRange[1] : localFilters.priceRange[0]"
+              :min="minPrice"
+              :max="maxPrice"
+              :value="
+                activeSlider === 'max' ? localFilters.priceRange[1] : localFilters.priceRange[0]
+              "
               @mousedown="handleSliderInteraction"
               @touchstart="handleSliderInteraction"
               @input="updatePrice"
@@ -374,7 +425,9 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      localFilters.stops.direct ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.direct
+                        ? 'translate-x-6 shadow-primary-100'
+                        : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -413,7 +466,9 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      localFilters.stops.oneStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.oneStop
+                        ? 'translate-x-6 shadow-primary-100'
+                        : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -452,7 +507,9 @@ onBeforeUnmount(() => {
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
                     :class="
-                      localFilters.stops.multiStop ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'
+                      localFilters.stops.multiStop
+                        ? 'translate-x-6 shadow-primary-100'
+                        : 'translate-x-1'
                     "
                   ></span>
                 </div>
@@ -490,10 +547,9 @@ onBeforeUnmount(() => {
             <!-- Zaznaczenie zakresu -->
             <div class="absolute h-2 rounded-full" :style="getDurationRangeStyle()"></div>
 
-            <!-- Skala czasu -->
             <div class="absolute -bottom-5 left-0 right-0 flex justify-between">
               <span class="text-xs text-gray-500">{{ formatDuration(60) }}</span>
-              <span class="text-xs text-gray-500">{{ formatDuration(localFilters.durationMax) }}</span>
+              <span class="text-xs text-gray-500">{{ formatDuration(maxDuration) }}</span>
             </div>
 
             <!-- Kciuk suwaka -->
@@ -502,11 +558,10 @@ onBeforeUnmount(() => {
               :style="getDurationThumbStyle()"
             ></div>
 
-            <!-- Input suwaka -->
             <input
               type="range"
               :min="60"
-              :max="localFilters.durationMax"
+              :max="maxDuration"
               :value="localFilters.durationMax"
               @input="handleDurationChange"
               class="absolute w-full h-2 bg-transparent appearance-none cursor-pointer duration-range-input"
@@ -521,7 +576,6 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Filtr linii lotniczych -->
     <div>
       <h4
         class="font-medium p-2 mb-3 sm:mb-4 flex items-center space-x-3"
@@ -537,10 +591,10 @@ onBeforeUnmount(() => {
         >
           <div class="space-y-3">
             <label
-              v-for="airline in localFilters.airlines"
-              :key="airline"
+              v-for="airlineCode in availableAirlines"
+              :key="airlineCode"
               class="flex items-center cursor-pointer group p-3 rounded-lg transition-all hover:bg-white hover:shadow-sm hover:border-primary-200 border border-transparent"
-              :for="`airline-${airline}`"
+              :for="`airline-${airlineCode}`"
             >
               <div class="flex items-center space-x-3 flex-1 min-w-0">
                 <div class="flex-shrink-0 w-5 flex justify-center">
@@ -550,39 +604,50 @@ onBeforeUnmount(() => {
                   <span
                     class="text-gray-800 font-medium text-sm leading-tight group-hover:text-primary-700"
                   >
-                    {{ airline }}
+                    {{ getAirlineDisplayName(airlineCode) }}
                   </span>
+                  <span class="text-xs text-gray-500 mt-0.5">{{ airlineCode }}</span>
                 </div>
               </div>
 
               <div class="flex items-center ml-4">
                 <input
                   type="checkbox"
-                  :checked="localFilters.airlines.includes(airline)"
-                  @change="(e) => handleAirlinesChange(airline, e)"
+                  :checked="!localFilters.airlines.includes(airlineCode)"
+                  @change="(e) => handleAirlinesChange(airlineCode, e)"
                   class="sr-only"
-                  :id="`airline-${airline}`"
-                  :aria-label="airline"
+                  :id="`airline-${airlineCode}`"
+                  :aria-label="getAirlineDisplayName(airlineCode)"
                 />
                 <div
                   class="relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-all duration-300 shadow-sm ring-1"
                   :class="
-                    localFilters.airlines.includes(airline)
+                    !localFilters.airlines.includes(airlineCode)
                       ? 'bg-primary-500 shadow-primary-200 ring-primary-300'
                       : 'bg-gray-200 hover:bg-gray-300 ring-gray-300'
                   "
                 >
                   <span
                     class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-all duration-300"
-                    :class="localFilters.airlines.includes(airline) ? 'translate-x-6 shadow-primary-100' : 'translate-x-1'"
+                    :class="
+                      !localFilters.airlines.includes(airlineCode)
+                        ? 'translate-x-6 shadow-primary-100'
+                        : 'translate-x-1'
+                    "
                   ></span>
                 </div>
               </div>
             </label>
           </div>
 
-          <div v-if="localFilters.airlines.length === 0" class="text-center text-gray-500 py-4">
-            <span class="text-sm">Brak dostępnych linii lotniczych</span>
+          <div
+            v-if="
+              localFilters.airlines.length === availableAirlines.length &&
+              availableAirlines.length > 0
+            "
+            class="text-center text-gray-500 py-4"
+          >
+            <span class="text-sm">Wszystkie linie lotnicze są wyłączone</span>
           </div>
         </div>
       </div>
