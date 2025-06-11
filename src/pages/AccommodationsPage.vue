@@ -2,15 +2,21 @@
 import SearchSection from '@/components/layout/SearchSection.vue'
 import FiltersSidebar from '@/components/layout/FiltersSidebar.vue'
 import AccommodationsList from '@/components/layout/AccommodationsList.vue'
-import DiagonalBlocks from '@/components/ui/DiagonalBlocks.vue'
 import SectionHeading from '@/components/layout/SectionHeading.vue'
 import MapPlaceholder from '@/components/layout/MapPlaceholder.vue'
+import AnimatedButton from '@/components/ui/AnimatedButton.vue'
+import { ref } from 'vue'
 
-// Import mock images
+const isFilterOpen = ref(false)
+
+// XDDDD
 import hotel1 from '@/assets/mock/hotel1.jpg'
 import hotel2 from '@/assets/mock/hotel2.jpg'
 import hotel3 from '@/assets/mock/hotel3.jpg'
-import heroImage from '@/assets/mock/hero-accommodation.jpg'
+
+// TO JEST CHYBA ZLE, ALE NIE UMIALME INACZEJ XDD
+import heroSmall from '@/assets/images/hero/accomodation-hero-small.jpg'
+import heroBig from '@/assets/images/hero/accomodation-hero-big.jpg'
 
 const mockAccommodations = [
   {
@@ -56,22 +62,31 @@ const selectedFilters = {
 </script>
 
 <template>
-  <!-- caly kontener -->
   <div class="flex flex-col min-h-screen bg-white">
-    <!-- hero image z gradientem -->
-    <section class="relative">
-      <!-- container na zdjecie w tle -->
-      <div class="absolute inset-0 z-0 h-[200px] sm:h-[300px] md:h-[400px]">
-        <img
-          :src="heroImage"
-          alt="Accommodation hero"
-          class="w-full h-full object-cover brightness-50"
-        />
+    <!-- hero section with adjusted height -->
+    <section class="relative h-[350px] lg:h-[450px] overflow-hidden">
+      <!-- hero background -->
+      <div class="absolute inset-0">
+        <picture>
+          <source
+            media="(min-width: 1024px)"
+            :srcset="heroBig"
+          />
+          <source
+            media="(max-width: 1023px)"
+            :srcset="heroSmall"
+          />
+          <img
+            :src="heroBig"
+            alt="Accommodation hero"
+            class="w-full h-full object-cover object-center brightness-75"
+          />
+        </picture>
       </div>
 
-      <!-- nakladka z tekstem -->
-      <div class="relative z-10 bg-gradient-to-b from-primary-600/90 to-primary-800/90 h-[200px] sm:h-[300px] md:h-[400px]">
-        <div class="container mx-auto px-4 sm:px-4 py-8 sm:py-12 md:py-20">
+      <!-- hero content -->
+      <div class="relative h-full z-10">
+        <div class="container mx-auto px-4 h-full flex flex-col justify-center items-center">
           <SectionHeading 
             title="Noclegi" 
             subtitle="Znajdź idealne miejsce na nocleg" 
@@ -81,51 +96,56 @@ const selectedFilters = {
       </div>
     </section>
 
-    <!-- searchbar -->
-    <SearchSection />
+    <!-- search section with improved styling -->
+    <section class="relative z-20 -mt-24 mb-16">
+      <div class="container mx-auto px-4">
+        <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+          <SearchSection />
+        </div>
+      </div>
+    </section>
 
-    <!-- glowna sekcja z hotelami -->
-    <section class="bg-gray-50">
+    <!-- main content with adjusted spacing -->
+    <section class="bg-gray-50 pt-4 pb-12">
       <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <!-- flex container na mape i hotele -->
         <div class="flex flex-col lg:flex-row gap-4 sm:gap-8">
-          <!-- lewa kolumna -->
-          <aside class="w-full lg:w-1/4 space-y-4 sm:space-y-6">
-            <!-- mapa (nie pokazuje sie na tel) -->
-            <div class="hidden sm:block bg-white rounded-lg shadow-md overflow-hidden sticky top-4">
-              <MapPlaceholder class="h-[200px] sm:h-[250px] md:h-[300px] w-full" />
+          <!-- sidebar -->
+          <aside class="w-full lg:w-1/4">
+            <!-- map (desktop only) -->
+            <div class="hidden lg:block bg-white rounded-lg shadow-md overflow-hidden mb-6">
+              <MapPlaceholder class="h-[250px] w-full object-cover" />
             </div>
             
-            <!-- mobilny przycisk do filtrow -->
-            <div class="fixed bottom-4 left-3 right-3 z-50 lg:hidden">
-              <button 
-                class="w-full bg-primary-600 text-white py-3 px-4 rounded-lg shadow-lg 
-                       font-medium flex items-center justify-center gap-2"
+            <!-- mobile filters button -->
+            <div class="fixed bottom-4 left-3 right-3 z-40 lg:hidden">
+              <AnimatedButton 
+                variant="primary" 
+                class="w-full flex items-center justify-center gap-2"
+                @click="isFilterOpen = true"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                         d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                 </svg>
                 Filtry
-              </button>
+              </AnimatedButton>
             </div>
             
-            <!-- filtry na desktop -->
+            <!-- desktop filters -->
             <div class="hidden lg:block">
-              <FiltersSidebar />
+              <FiltersSidebar :is-open="isFilterOpen" @close="isFilterOpen = false" />
             </div>
           </aside>
 
-          <!-- prawa kolumna z lista hoteli -->
+          <!-- main content -->
           <main class="w-full lg:w-3/4">
-            <!-- naglowek z licznikiem -->
-            <div class="bg-white rounded-lg shadow-md p-3 sm:p-4">
+            <!-- header with counter -->
+            <div class="bg-white rounded-lg shadow-md p-2 sm:p-3 md:p-4">
               <div class="flex items-center justify-between flex-wrap gap-2">
-                <h2 class="text-base sm:text-lg font-semibold text-gray-800">
+                <h2 class="text-sm sm:text-base md:text-lg font-semibold text-gray-800">
                   Znaleziono {{ mockAccommodations.length }} obiektów
                 </h2>
-                <!-- dropdown do sortowania -->
-                <select class="text-sm border rounded-lg p-2 w-full sm:w-auto max-w-[200px]">
+                <select class="text-xs sm:text-sm border rounded-lg p-1.5 sm:p-2 w-full sm:w-auto max-w-[160px] sm:max-w-[200px]">
                   <option>Sortuj: Polecane</option>
                   <option>Cena: od najniższej</option>
                 </select>
@@ -133,10 +153,10 @@ const selectedFilters = {
             </div>
 
             <!-- separator -->
-            <div class="h-6 sm:h-8"></div>
+            <div class="h-4 sm:h-6 md:h-8"></div>
 
-            <!-- lista hoteli (padding na dole przez filtr) -->
-            <div class="bg-transparent pb-20 lg:pb-0">
+            <!-- accommodations list -->
+            <div class="bg-transparent pb-24 lg:pb-0">
               <AccommodationsList 
                 :accommodations="mockAccommodations"
               />

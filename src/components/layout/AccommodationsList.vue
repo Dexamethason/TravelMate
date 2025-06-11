@@ -51,14 +51,18 @@ const getRatingStars = (rating: number) => "★".repeat(Math.round(rating))
             <p class="text-gray-600 mb-4 flex-grow">{{ accommodation.description }}</p>
 
             <!-- Cena i przyciski -->
-            <div class="flex flex-wrap justify-between items-center gap-4 mt-auto">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-auto">
               <div>
                 <p class="text-sm text-gray-500 mb-1">Cena za noc</p>
                 <p class="text-2xl font-bold text-primary-600">{{ accommodation.price }} zł</p>
               </div>
-              <div class="flex gap-4">
-                <AnimatedButton variant="outline">Dodaj do planera</AnimatedButton>
-                <AnimatedButton variant="primary">Przejdź do oferty</AnimatedButton>
+              <div class="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-4">
+                <AnimatedButton variant="outline" class="text-sm sm:text-base py-2 px-4">
+                  Dodaj do planera
+                </AnimatedButton>
+                <AnimatedButton variant="primary" class="text-sm sm:text-base py-2 px-4">
+                  Przejdź do oferty
+                </AnimatedButton>
               </div>
             </div>
           </div>
