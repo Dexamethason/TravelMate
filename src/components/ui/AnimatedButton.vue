@@ -43,6 +43,7 @@ defineProps({
     box-shadow 0.3s;
   overflow: hidden;
   z-index: 0;
+  cursor: pointer;
 }
 
 .btn-special-animation::before {
