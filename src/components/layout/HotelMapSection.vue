@@ -15,7 +15,7 @@ defineProps<{
         <AccommodationsList :accommodations="accommodations" />
       </div>
 
-      <!-- Map -->
+      <!-- Mapa -->
       <div class="w-full lg:w-2/5 sticky top-4">
         <MapPlaceholder class="h-[calc(100vh-2rem)]" />
       </div>
