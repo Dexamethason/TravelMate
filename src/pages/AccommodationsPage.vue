@@ -38,8 +38,8 @@ const mockAccommodations = [
       wifi: true,
       pool: true,
       gym: true,
-      airCon: true
-    }
+      airCon: true,
+    },
   },
   {
     id: 2,
@@ -59,8 +59,8 @@ const mockAccommodations = [
       wifi: true,
       pool: false,
       gym: false,
-      airCon: true
-    }
+      airCon: true,
+    },
   },
   {
     id: 3,
@@ -80,8 +80,8 @@ const mockAccommodations = [
       wifi: true,
       pool: false,
       gym: true,
-      airCon: true
-    }
+      airCon: true,
+    },
   },
   {
     id: 4,
@@ -101,8 +101,8 @@ const mockAccommodations = [
       wifi: true,
       pool: true,
       gym: true,
-      airCon: true
-    }
+      airCon: true,
+    },
   },
   {
     id: 5,
@@ -122,9 +122,9 @@ const mockAccommodations = [
       wifi: true,
       pool: false,
       gym: false,
-      airCon: true
-    }
-  }
+      airCon: true,
+    },
+  },
 ]
 
 const selectedFilters = {
@@ -137,14 +137,8 @@ const selectedFilters = {
 }
 
 // Add sorting options
-const sortOptions = [
-  'recommended', 
-  'price-desc', 
-  'price-asc',
-  'stars-desc',
-  'stars-asc'
-] as const
-type SortOption = typeof sortOptions[number]
+const sortOptions = ['recommended', 'price-desc', 'price-asc', 'stars-desc', 'stars-asc'] as const
+type SortOption = (typeof sortOptions)[number]
 
 // Handle sort change
 const handleSort = (option: SortOption) => {
@@ -154,19 +148,19 @@ const handleSort = (option: SortOption) => {
 // Helper function to calculate recommendation score
 const getRecommendationScore = (item: any) => {
   let score = 0
-  
+
   // Higher rating gives more points (0-5 points)
   score += item.rating
-  
+
   // More amenities give more points (0-3 points)
   score += item.amenities.length * 0.3
-  
+
   // Closer to center gives more points (0-2 points)
   score += (5 - item.distanceFromCenter) * 0.4
-  
+
   // More stars give more points (0-2.5 points)
   score += item.stars * 0.5
-  
+
   // Better price/quality ratio gives more points (0-2 points)
   const priceQualityRatio = (item.rating * item.stars) / item.price
   score += priceQualityRatio * 10
@@ -178,12 +172,12 @@ const getRecommendationScore = (item: any) => {
 const activeFilters = ref({
   budget: 1000,
   features: [] as string[],
-  stars: [] as number[]
+  stars: [] as number[],
 })
 
 // filtrowane hotele
 const filteredAccommodations = computed(() => {
-  return mockAccommodations.filter(hotel => {
+  return mockAccommodations.filter((hotel) => {
     // filtr ceny
     if (hotel.price > activeFilters.value.budget) {
       return false
@@ -191,9 +185,11 @@ const filteredAccommodations = computed(() => {
 
     // filtr udogodnień
     if (activeFilters.value.features.length > 0) {
-      if (!activeFilters.value.features.every(feature => 
-        hotel.features?.[feature as keyof typeof hotel.features]
-      )) {
+      if (
+        !activeFilters.value.features.every(
+          (feature) => hotel.features?.[feature as keyof typeof hotel.features],
+        )
+      ) {
         return false
       }
     }
@@ -212,7 +208,7 @@ const filteredAccommodations = computed(() => {
 // połączone filtrowanie i sortowanie
 const filteredAndSortedAccommodations = computed(() => {
   // najpierw filtrujemy
-  const filtered = mockAccommodations.filter(hotel => {
+  const filtered = mockAccommodations.filter((hotel) => {
     // filtr ceny
     if (hotel.price > activeFilters.value.budget) {
       return false
@@ -220,9 +216,11 @@ const filteredAndSortedAccommodations = computed(() => {
 
     // filtr udogodnień
     if (activeFilters.value.features.length > 0) {
-      if (!activeFilters.value.features.every(feature => 
-        hotel.features?.[feature as keyof typeof hotel.features]
-      )) {
+      if (
+        !activeFilters.value.features.every(
+          (feature) => hotel.features?.[feature as keyof typeof hotel.features],
+        )
+      ) {
         return false
       }
     }
@@ -269,14 +267,8 @@ const handleFilters = (filters: any) => {
       <!-- hero background -->
       <div class="absolute inset-0">
         <picture>
-          <source
-            media="(min-width: 1024px)"
-            :srcset="heroBig"
-          />
-          <source
-            media="(max-width: 1023px)"
-            :srcset="heroSmall"
-          />
+          <source media="(min-width: 1024px)" :srcset="heroBig" />
+          <source media="(max-width: 1023px)" :srcset="heroSmall" />
           <img
             :src="heroBig"
             alt="Accommodation hero"
@@ -287,10 +279,14 @@ const handleFilters = (filters: any) => {
 
       <!-- hero content -->
       <div class="relative h-full z-10">
-        <div class="container mx-auto px-4 h-full flex flex-col justify-center items-center">
-          <SectionHeading 
-            title="Noclegi" 
-            subtitle="Znajdź idealne miejsce na nocleg" 
+        <!-- Use consistent container width like flights page -->
+        <div
+          class="mx-auto px-4 sm:px-6 md:px-8 h-full flex flex-col justify-center items-center"
+          style="width: min(1184px, 100vw)"
+        >
+          <SectionHeading
+            title="Noclegi"
+            subtitle="Znajdź idealne miejsce na nocleg"
             class="text-white text-center"
           />
         </div>
@@ -299,7 +295,8 @@ const handleFilters = (filters: any) => {
 
     <!-- search section with improved styling -->
     <section class="relative z-20 -mt-24 mb-16">
-      <div class="container mx-auto px-4">
+      <!-- Use consistent container width like flights page -->
+      <div class="mx-auto px-4 sm:px-6 md:px-8" style="width: min(1184px, 100vw)">
         <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
           <SearchSection />
         </div>
@@ -308,7 +305,8 @@ const handleFilters = (filters: any) => {
 
     <!-- glowna sekcja z hotelami -->
     <section class="bg-gray-50 pt-4 pb-12">
-      <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <!-- Use consistent container width like flights page -->
+      <div class="mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-8" style="width: min(1184px, 100vw)">
         <div class="flex flex-col lg:flex-row gap-4 sm:gap-8">
           <!-- sidebar -->
           <aside class="w-full lg:w-1/4">
@@ -316,14 +314,13 @@ const handleFilters = (filters: any) => {
             <div class="hidden lg:block bg-white rounded-lg shadow-md overflow-hidden mb-6">
               <MapPlaceholder class="h-[250px] w-full object-cover" />
             </div>
-            
+
             <!-- mobilny przycisk do filtrow -->
             <div class="fixed bottom-4 left-3 right-3 z-40 lg:hidden">
-              <AnimatedButton 
-                variant="primary" 
+              <AnimatedButton
+                variant="primary"
                 class="w-full flex items-center justify-center gap-2"
                 @click="isFilterOpen = true"
-
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -339,9 +336,9 @@ const handleFilters = (filters: any) => {
 
             <!-- filtry na desktop -->
             <div class="hidden lg:block">
-              <FiltersSidebar 
-                :is-open="isFilterOpen" 
-                @close="isFilterOpen = false" 
+              <FiltersSidebar
+                :is-open="isFilterOpen"
+                @close="isFilterOpen = false"
                 @apply-filters="handleFilters"
                 @reset-filters="() => handleFilters({ budget: 1000, features: [], stars: [] })"
               />
@@ -357,7 +354,7 @@ const handleFilters = (filters: any) => {
                   Znaleziono {{ mockAccommodations.length }} obiektów
                 </h2>
                 <!-- Add sorting controls -->
-                <select 
+                <select
                   v-model="sortBy"
                   class="text-xs sm:text-sm border rounded-lg p-1.5 sm:p-2 w-full sm:w-auto max-w-[160px] sm:max-w-[200px] cursor-pointer"
                 >
@@ -375,13 +372,20 @@ const handleFilters = (filters: any) => {
 
             <!-- lista hoteli -->
             <div class="bg-transparent pb-24 lg:pb-0">
-              <AccommodationsList 
-                :accommodations="filteredAndSortedAccommodations"
-              />
+              <AccommodationsList :accommodations="filteredAndSortedAccommodations" />
             </div>
           </main>
         </div>
       </div>
     </section>
+
+    <!-- Mobile filters overlay -->
+    <FiltersSidebar
+      :is-open="isFilterOpen"
+      @close="isFilterOpen = false"
+      @apply-filters="handleFilters"
+      @reset-filters="() => handleFilters({ budget: 1000, features: [], stars: [] })"
+      class="lg:hidden"
+    />
   </div>
 </template>
