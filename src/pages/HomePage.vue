@@ -5,7 +5,6 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 
 <template>
   <div>
-    <!-- Sekcja hero na całą szerokość -->
     <HeroSection />
 
   </div>

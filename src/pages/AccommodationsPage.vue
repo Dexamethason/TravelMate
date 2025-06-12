@@ -85,27 +85,6 @@ const mockAccommodations = [
   },
   {
     id: 4,
-    title: 'WSEI PSB MRÓWKA',
-    description: 'PSYCHIATRYK',
-    price: 120,
-    rating: 3.8,
-    image: hotel2,
-    amenities: ['WiFi', 'Wspólna kuchnia'],
-    address: 'Warszawa, 3.5km od centrum',
-    distanceFromCenter: 3.5,
-    stars: 2,
-    features: {
-      breakfast: false,
-      freeCancel: true,
-      parking: false,
-      wifi: true,
-      pool: false,
-      gym: false,
-      airCon: false
-    }
-  },
-  {
-    id: 5,
     title: 'Resort & Spa',
     description: 'Luksusowy resort z basenem',
     price: 850,
@@ -125,15 +104,18 @@ const mockAccommodations = [
       airCon: true
     }
   }
+    amenities: ['Parking', 'Ogród'],
+    address: 'Warszawa, 5km od centrum',
+  },
 ]
 
 const selectedFilters = {
   city: 'Warszawa',
   dates: {
     checkIn: '05.06.2025',
-    checkOut: '08.06.2025'
+    checkOut: '08.06.2025',
   },
-  guests: '2 dorosłych, 1 pokój'
+  guests: '2 dorosłych, 1 pokój',
 }
 
 // Add sorting options
@@ -306,7 +288,7 @@ const handleFilters = (filters: any) => {
       </div>
     </section>
 
-    <!-- main content with adjusted spacing -->
+    <!-- glowna sekcja z hotelami -->
     <section class="bg-gray-50 pt-4 pb-12">
       <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <div class="flex flex-col lg:flex-row gap-4 sm:gap-8">
@@ -317,22 +299,27 @@ const handleFilters = (filters: any) => {
               <MapPlaceholder class="h-[250px] w-full object-cover" />
             </div>
             
-            <!-- mobile filters button -->
+            <!-- mobilny przycisk do filtrow -->
             <div class="fixed bottom-4 left-3 right-3 z-40 lg:hidden">
               <AnimatedButton 
                 variant="primary" 
                 class="w-full flex items-center justify-center gap-2"
                 @click="isFilterOpen = true"
+
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                  />
                 </svg>
                 Filtry
               </AnimatedButton>
             </div>
-            
-            <!-- desktop filters -->
+
+            <!-- filtry na desktop -->
             <div class="hidden lg:block">
               <FiltersSidebar 
                 :is-open="isFilterOpen" 
@@ -368,7 +355,7 @@ const handleFilters = (filters: any) => {
             <!-- separator -->
             <div class="h-4 sm:h-6 md:h-8"></div>
 
-            <!-- accommodations list -->
+            <!-- lista hoteli -->
             <div class="bg-transparent pb-24 lg:pb-0">
               <AccommodationsList 
                 :accommodations="filteredAndSortedAccommodations"
