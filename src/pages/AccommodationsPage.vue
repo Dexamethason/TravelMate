@@ -103,10 +103,28 @@ const mockAccommodations = [
       gym: true,
       airCon: true
     }
-  }
+  },
+  {
+    id: 5,
+    title: 'Hotel Ogrodowy',
+    description: 'Spokojny hotel z ogrodem',
+    price: 320,
+    rating: 4.1,
+    image: hotel2,
     amenities: ['Parking', 'Ogród'],
     address: 'Warszawa, 5km od centrum',
-  },
+    distanceFromCenter: 5.0,
+    stars: 3,
+    features: {
+      breakfast: true,
+      freeCancel: true,
+      parking: true,
+      wifi: true,
+      pool: false,
+      gym: false,
+      airCon: true
+    }
+  }
 ]
 
 const selectedFilters = {
