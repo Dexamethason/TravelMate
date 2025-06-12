@@ -1,12 +1,34 @@
 <script setup lang="ts">
-// importy
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 
 // zmienna do otwierania filtrow na mobile
 const isOpen = ref(false)
-const budget = ref(500) // Default value
-const maxBudget = 1000 // Maximum budget value
+
+// stany filtrow
+const filters = reactive({
+  features: {
+    breakfast: false,
+    freeCancel: false,
+    parking: false,
+    wifi: false,
+    pool: false,
+    gym: false,
+    airCon: false
+  },
+  stars: {
+    five: false,
+    four: false,
+    three: false
+  },
+  location: {
+    center: false,
+    nearCenter: false
+  }
+})
+
+const budget = ref(1000)
+const maxBudget = 1000
 
 const formatPrice = (value: number) => {
   return `${value} zł`
@@ -17,9 +39,38 @@ const closeFilters = () => {
   isOpen.value = false
 }
 
-// aplikowanie filtrow (do zrobienia pozniej)
+// aplikowanie filtrow
+const emit = defineEmits(['apply-filters', 'reset-filters'])
+
 const applyFilters = () => {
-  // logika filtrowania
+  emit('apply-filters', {
+    budget: budget.value,
+    features: Object.entries(filters.features)
+      .filter(([_, value]) => value)
+      .map(([key]) => key),
+    stars: Object.entries(filters.stars)
+      .filter(([_, value]) => value)
+      .map(([key]) => {
+        if (key === 'five') return 5
+        if (key === 'four') return 4
+        if (key === 'three') return 3
+        return 0
+      })
+      .filter(star => star > 0)
+  })
+  closeFilters()
+}
+
+// reset filtrow
+const resetFilters = () => {
+  budget.value = maxBudget
+  Object.keys(filters.features).forEach(key => {
+    filters.features[key] = false
+  })
+  Object.keys(filters.stars).forEach(key => {
+    filters.stars[key] = false
+  })
+  emit('reset-filters')
   closeFilters()
 }
 </script>
@@ -39,6 +90,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.breakfast"
                 />
                 <span class="ml-2 text-sm text-gray-700">Śniadanie w cenie</span>
               </div>
@@ -46,14 +98,18 @@ const applyFilters = () => {
             <label class="flex items-center group cursor-pointer">
               <div class="relative flex items-center">
                 <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                                             focus:ring-primary-500 cursor-pointer" />
+                                             focus:ring-primary-500 cursor-pointer" 
+                v-model="filters.features.freeCancel"
+                />
                 <span class="ml-2 text-sm text-gray-700">Bezpłatne odwołanie</span>
               </div>
             </label>
             <label class="flex items-center group cursor-pointer">
               <div class="relative flex items-center">
                 <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                                             focus:ring-primary-500 cursor-pointer" />
+                                             focus:ring-primary-500 cursor-pointer" 
+                v-model="filters.features.parking"
+                />
                 <span class="ml-2 text-sm text-gray-700">Parking na miejscu</span>
               </div>
             </label>
@@ -86,7 +142,7 @@ const applyFilters = () => {
           </div>
         </div>
 
-        <!-- gwiazdki hotelu - poprawione checkboxy -->
+        <!-- gwiazdki hotelu XD - poprawione checkboxy -->
         <div class="pt-2">
           <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-4">Kategoria (gwiazdki)</h3>
           <div class="space-y-3">
@@ -94,8 +150,8 @@ const applyFilters = () => {
               <div class="relative flex items-center">
                 <input 
                   type="checkbox" 
-                  class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                         focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.stars.five"
+                  class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
                 />
                 <span class="ml-3 text-yellow-400 flex items-center">
                   ★★★★★
@@ -126,7 +182,7 @@ const applyFilters = () => {
           </div>
         </div>
 
-        <!-- udogodnienia -->
+        <!-- Udogodnienia -->
         <div class="pt-2">
           <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-4">Udogodnienia</h3>
           <div class="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-4">
@@ -136,6 +192,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.wifi"
                 />
                 <span class="ml-2 text-sm text-gray-700">WiFi</span>
               </div>
@@ -146,6 +203,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.airCon"
                 />
                 <span class="ml-2 text-sm text-gray-700">Klimatyzacja</span>
               </div>
@@ -156,6 +214,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.pool"
                 />
                 <span class="ml-2 text-sm text-gray-700">Basen</span>
               </div>
@@ -166,6 +225,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.gym"
                 />
                 <span class="ml-2 text-sm text-gray-700">Siłownia</span>
               </div>
@@ -181,8 +241,8 @@ const applyFilters = () => {
               <div class="relative flex items-center">
                 <input 
                   type="checkbox" 
-                  class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                         focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.location.center"
+                  class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
                 />
                 <span class="ml-3 text-gray-700">Centrum (< 1km)</span>
               </div>
@@ -191,8 +251,8 @@ const applyFilters = () => {
               <div class="relative flex items-center">
                 <input 
                   type="checkbox" 
-                  class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                         focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.location.nearCenter"
+                  class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
                 />
                 <span class="ml-3 text-gray-700">Okolice centrum (< 3km)</span>
               </div>
@@ -206,13 +266,13 @@ const applyFilters = () => {
         <AnimatedButton variant="primary" @click="applyFilters">
           Zastosuj filtry
         </AnimatedButton>
-        <AnimatedButton variant="outline" @click="closeFilters">
+        <AnimatedButton variant="outline" @click="resetFilters">
           Wyczyść wszystko
         </AnimatedButton>
       </div>
     </div>
 
-    <!-- mobilny drawer (poprawiony) -->
+    <!-- mobilny drawer -->
     <div 
       v-if="isOpen" 
       class="fixed inset-0 z-50 lg:hidden"
@@ -248,6 +308,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.breakfast"
                 />
                 <span class="ml-2 text-sm text-gray-700">Śniadanie w cenie</span>
               </div>
@@ -255,14 +316,18 @@ const applyFilters = () => {
             <label class="flex items-center group cursor-pointer">
               <div class="relative flex items-center">
                 <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                                             focus:ring-primary-500 cursor-pointer" />
+                                             focus:ring-primary-500 cursor-pointer" 
+                v-model="filters.features.freeCancel"
+                />
                 <span class="ml-2 text-sm text-gray-700">Bezpłatne odwołanie</span>
               </div>
             </label>
             <label class="flex items-center group cursor-pointer">
               <div class="relative flex items-center">
                 <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
-                                             focus:ring-primary-500 cursor-pointer" />
+                                             focus:ring-primary-500 cursor-pointer" 
+                v-model="filters.features.parking"
+                />
                 <span class="ml-2 text-sm text-gray-700">Parking na miejscu</span>
               </div>
             </label>
@@ -270,7 +335,7 @@ const applyFilters = () => {
         </div>
 
         <!-- budzet -->
-        <div class="pt-2"> <!-- dodany padding top dla lepszej separacji -->
+        <div class="pt-2">
           <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-4">Twój budżet</h3>
           <div class="space-y-4 sm:space-y-6">
             <div class="relative pt-1">
@@ -296,38 +361,32 @@ const applyFilters = () => {
           </div>
         </div>
 
-        <!-- gwiazdki hotelu - poprawione checkboxy -->
+        <!-- gwiazdki hotelu -->
         <div class="pt-2">
           <h3 class="text-sm sm:text-base font-semibold text-gray-800 mb-4">Kategoria (gwiazdki)</h3>
           <div class="space-y-3">
             <label class="flex items-center group cursor-pointer">
-              <input type="checkbox" class="peer sr-only" />
-              <div class="w-5 h-5 border-2 border-gray-300 rounded transition-colors
-                          peer-checked:border-primary-600 peer-checked:bg-primary-600
-                          group-hover:border-primary-400">
-              </div>
+              <input 
+                type="checkbox" 
+                v-model="filters.stars.five"
+                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+              />
               <span class="ml-3 text-yellow-400 flex items-center">
                 ★★★★★
                 <span class="text-gray-500 text-sm ml-2">(54)</span>
               </span>
             </label>
             <label class="flex items-center group cursor-pointer">
-              <input type="checkbox" class="peer sr-only" />
-              <div class="w-5 h-5 border-2 border-gray-300 rounded transition-colors
-                          peer-checked:border-primary-600 peer-checked:bg-primary-600
-                          group-hover:border-primary-400">
-              </div>
+              <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
+                                           focus:ring-primary-500 cursor-pointer" />
               <span class="ml-3 text-yellow-400 flex items-center">
                 ★★★★
                 <span class="text-gray-500 text-sm ml-2">(32)</span>
               </span>
             </label>
             <label class="flex items-center group cursor-pointer">
-              <input type="checkbox" class="peer sr-only" />
-              <div class="w-5 h-5 border-2 border-gray-300 rounded transition-colors
-                          peer-checked:border-primary-600 peer-checked:bg-primary-600
-                          group-hover:border-primary-400">
-              </div>
+              <input type="checkbox" class="w-4 h-4 text-primary-600 border-gray-300 rounded 
+                                           focus:ring-primary-500 cursor-pointer" />
               <span class="ml-3 text-yellow-400 flex items-center">
                 ★★★
                 <span class="text-gray-500 text-sm ml-2">(12)</span>
@@ -346,6 +405,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.wifi"
                 />
                 <span class="ml-2 text-sm text-gray-700">WiFi</span>
               </div>
@@ -356,6 +416,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.airCon"
                 />
                 <span class="ml-2 text-sm text-gray-700">Klimatyzacja</span>
               </div>
@@ -366,6 +427,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.pool"
                 />
                 <span class="ml-2 text-sm text-gray-700">Basen</span>
               </div>
@@ -376,6 +438,7 @@ const applyFilters = () => {
                   type="checkbox" 
                   class="w-4 h-4 text-primary-600 border-gray-300 rounded 
                          focus:ring-primary-500 cursor-pointer"
+                  v-model="filters.features.gym"
                 />
                 <span class="ml-2 text-sm text-gray-700">Siłownia</span>
               </div>
@@ -420,7 +483,7 @@ const applyFilters = () => {
             <AnimatedButton 
               variant="outline" 
               class="w-full"
-              @click="closeFilters"
+              @click="resetFilters"
             >
               Anuluj
             </AnimatedButton>

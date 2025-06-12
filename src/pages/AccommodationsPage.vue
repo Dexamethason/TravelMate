@@ -5,9 +5,10 @@ import AccommodationsList from '@/components/layout/AccommodationsList.vue'
 import SectionHeading from '@/components/layout/SectionHeading.vue'
 import MapPlaceholder from '@/components/layout/MapPlaceholder.vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const isFilterOpen = ref(false)
+const sortBy = ref('recommended')
 
 // XDDDD
 import hotel1 from '@/assets/mock/hotel1.jpg'
@@ -26,28 +27,103 @@ const mockAccommodations = [
     price: 450,
     rating: 5.0,
     image: hotel1,
-    amenities: ['Parking', 'WiFi', 'Restauracja'],
-    address: 'Warszawa, 350m od centrum'
+    amenities: ['Parking', 'WiFi', 'Restauracja', 'Basen', 'Spa'],
+    address: 'Warszawa, 350m od centrum',
+    distanceFromCenter: 0.35,
+    stars: 5,
+    features: {
+      breakfast: true,
+      freeCancel: true,
+      parking: true,
+      wifi: true,
+      pool: true,
+      gym: true,
+      airCon: true
+    }
   },
   {
     id: 2,
     title: 'Apartamenty Centrum',
     description: 'Przytulne apartamenty',
     price: 280,
-    rating: 2.5,
+    rating: 4.2,
     image: hotel2,
     amenities: ['WiFi', 'Kuchnia'],
-    address: 'Warszawa, 1.2km od centrum'
+    address: 'Warszawa, 1.2km od centrum',
+    distanceFromCenter: 1.2,
+    stars: 3,
+    features: {
+      breakfast: false,
+      freeCancel: true,
+      parking: false,
+      wifi: true,
+      pool: false,
+      gym: false,
+      airCon: true
+    }
   },
   {
     id: 3,
     title: 'Urzond wojewodzki',
     description: 'Spokojny hotel z ogrodem',
-    price: 9990,
-    rating: 0.1,
+    price: 999,
+    rating: 1,
     image: hotel3,
-    amenities: ['Parking', 'Ogród'],
-    address: 'Warszawa, 5km od centrum'
+    amenities: ['Parking', 'WiFi', 'Sala konferencyjna'],
+    address: 'Warszawa, 2.5km od centrum',
+    distanceFromCenter: 2.5,
+    stars: 4,
+    features: {
+      breakfast: true,
+      freeCancel: false,
+      parking: true,
+      wifi: true,
+      pool: false,
+      gym: true,
+      airCon: true
+    }
+  },
+  {
+    id: 4,
+    title: 'WSEI PSB MRÓWKA',
+    description: 'PSYCHIATRYK',
+    price: 120,
+    rating: 3.8,
+    image: hotel2,
+    amenities: ['WiFi', 'Wspólna kuchnia'],
+    address: 'Warszawa, 3.5km od centrum',
+    distanceFromCenter: 3.5,
+    stars: 2,
+    features: {
+      breakfast: false,
+      freeCancel: true,
+      parking: false,
+      wifi: true,
+      pool: false,
+      gym: false,
+      airCon: false
+    }
+  },
+  {
+    id: 5,
+    title: 'Resort & Spa',
+    description: 'Luksusowy resort z basenem',
+    price: 850,
+    rating: 4.9,
+    image: hotel1,
+    amenities: ['Parking', 'WiFi', 'Spa', 'Basen', 'Restauracja'],
+    address: 'Warszawa, 4.2km od centrum',
+    distanceFromCenter: 4.2,
+    stars: 5,
+    features: {
+      breakfast: true,
+      freeCancel: true,
+      parking: true,
+      wifi: true,
+      pool: true,
+      gym: true,
+      airCon: true
+    }
   }
 ]
 
@@ -58,6 +134,131 @@ const selectedFilters = {
     checkOut: '08.06.2025'
   },
   guests: '2 dorosłych, 1 pokój'
+}
+
+// Add sorting options
+const sortOptions = [
+  'recommended', 
+  'price-desc', 
+  'price-asc',
+  'stars-desc',
+  'stars-asc'
+] as const
+type SortOption = typeof sortOptions[number]
+
+// Handle sort change
+const handleSort = (option: SortOption) => {
+  sortBy.value = option
+}
+
+// Helper function to calculate recommendation score
+const getRecommendationScore = (item: any) => {
+  let score = 0
+  
+  // Higher rating gives more points (0-5 points)
+  score += item.rating
+  
+  // More amenities give more points (0-3 points)
+  score += item.amenities.length * 0.3
+  
+  // Closer to center gives more points (0-2 points)
+  score += (5 - item.distanceFromCenter) * 0.4
+  
+  // More stars give more points (0-2.5 points)
+  score += item.stars * 0.5
+  
+  // Better price/quality ratio gives more points (0-2 points)
+  const priceQualityRatio = (item.rating * item.stars) / item.price
+  score += priceQualityRatio * 10
+
+  return score
+}
+
+// stan filtrów
+const activeFilters = ref({
+  budget: 1000,
+  features: [] as string[],
+  stars: [] as number[]
+})
+
+// filtrowane hotele
+const filteredAccommodations = computed(() => {
+  return mockAccommodations.filter(hotel => {
+    // filtr ceny
+    if (hotel.price > activeFilters.value.budget) {
+      return false
+    }
+
+    // filtr udogodnień
+    if (activeFilters.value.features.length > 0) {
+      if (!activeFilters.value.features.every(feature => 
+        hotel.features?.[feature as keyof typeof hotel.features]
+      )) {
+        return false
+      }
+    }
+
+    // filtr gwiazdek
+    if (activeFilters.value.stars.length > 0) {
+      if (!activeFilters.value.stars.includes(hotel.stars)) {
+        return false
+      }
+    }
+
+    return true
+  })
+})
+
+// połączone filtrowanie i sortowanie
+const filteredAndSortedAccommodations = computed(() => {
+  // najpierw filtrujemy
+  const filtered = mockAccommodations.filter(hotel => {
+    // filtr ceny
+    if (hotel.price > activeFilters.value.budget) {
+      return false
+    }
+
+    // filtr udogodnień
+    if (activeFilters.value.features.length > 0) {
+      if (!activeFilters.value.features.every(feature => 
+        hotel.features?.[feature as keyof typeof hotel.features]
+      )) {
+        return false
+      }
+    }
+
+    // filtr gwiazdek
+    if (activeFilters.value.stars.length > 0) {
+      if (!activeFilters.value.stars.includes(hotel.stars)) {
+        return false
+      }
+    }
+
+    return true
+  })
+
+  // potem sortujemy
+  return filtered.sort((a, b) => {
+    switch (sortBy.value) {
+      case 'recommended':
+        return getRecommendationScore(b) - getRecommendationScore(a)
+      case 'price-desc':
+        return b.price - a.price
+      case 'price-asc':
+        return a.price - b.price
+      case 'stars-desc':
+        return b.stars - a.stars
+      case 'stars-asc':
+        return a.stars - b.stars
+      default:
+        return 0
+    }
+  })
+})
+
+// handler filtrów
+const handleFilters = (filters: any) => {
+  activeFilters.value = filters
 }
 </script>
 
@@ -133,7 +334,12 @@ const selectedFilters = {
             
             <!-- desktop filters -->
             <div class="hidden lg:block">
-              <FiltersSidebar :is-open="isFilterOpen" @close="isFilterOpen = false" />
+              <FiltersSidebar 
+                :is-open="isFilterOpen" 
+                @close="isFilterOpen = false" 
+                @apply-filters="handleFilters"
+                @reset-filters="() => handleFilters({ budget: 1000, features: [], stars: [] })"
+              />
             </div>
           </aside>
 
@@ -145,9 +351,16 @@ const selectedFilters = {
                 <h2 class="text-sm sm:text-base md:text-lg font-semibold text-gray-800">
                   Znaleziono {{ mockAccommodations.length }} obiektów
                 </h2>
-                <select class="text-xs sm:text-sm border rounded-lg p-1.5 sm:p-2 w-full sm:w-auto max-w-[160px] sm:max-w-[200px]">
-                  <option>Sortuj: Polecane</option>
-                  <option>Cena: od najniższej</option>
+                <!-- Add sorting controls -->
+                <select 
+                  v-model="sortBy"
+                  class="text-xs sm:text-sm border rounded-lg p-1.5 sm:p-2 w-full sm:w-auto max-w-[160px] sm:max-w-[200px] cursor-pointer"
+                >
+                  <option value="recommended">Polecane</option>
+                  <option value="price-desc">Cena: od najwyższej</option>
+                  <option value="price-asc">Cena: od najniższej</option>
+                  <option value="stars-desc">Gwiazdki: 5-1</option>
+                  <option value="stars-asc">Gwiazdki: 1-5</option>
                 </select>
               </div>
             </div>
@@ -158,7 +371,7 @@ const selectedFilters = {
             <!-- accommodations list -->
             <div class="bg-transparent pb-24 lg:pb-0">
               <AccommodationsList 
-                :accommodations="mockAccommodations"
+                :accommodations="filteredAndSortedAccommodations"
               />
             </div>
           </main>

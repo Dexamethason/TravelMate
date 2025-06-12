@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 
 const checkInInput = ref<HTMLInputElement | null>(null)
@@ -7,12 +7,55 @@ const checkOutInput = ref<HTMLInputElement | null>(null)
 const checkInDate = ref('')
 const checkOutDate = ref('')
 
+// Dzisiejsza data do ograniczenia minimalnej wartości
+const today = new Date().toISOString().split('T')[0]
+
+// Funkcja do określenia optymalnej pozycji kalendarza
+const getOptimalCalendarPosition = () => {
+  const screenWidth = window.innerWidth
+  if (screenWidth < 768) {
+    return 'inset-0 opacity-0 pointer-events-none'
+  } else {
+    return 'left-4 top-1/2 transform -translate-y-1/2 opacity-0 pointer-events-none w-0 h-0 z-0'
+  }
+}
+
+const calendarPosition = ref(getOptimalCalendarPosition())
+
+// Nasłuchiwanie zmiany rozmiaru okna
+const updateCalendarPosition = () => {
+  calendarPosition.value = getOptimalCalendarPosition()
+}
+
+onMounted(() => {
+  window.addEventListener('resize', updateCalendarPosition)
+  updateCalendarPosition()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateCalendarPosition)
+})
+
+// Funkcje otwierania kalendarzy
 const openDatePicker = (type: 'checkIn' | 'checkOut') => {
+  updateCalendarPosition()
   if (type === 'checkIn' && checkInInput.value) {
     checkInInput.value.showPicker()
   } else if (type === 'checkOut' && checkOutInput.value) {
     checkOutInput.value.showPicker()
   }
+}
+
+// Formatowanie daty
+const formatDisplayDate = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }
+  return date.toLocaleDateString('pl-PL', options)
 }
 
 const guestsInput = ref<HTMLSelectElement | null>(null)
@@ -54,67 +97,97 @@ const guestOptions = [
     <div class="container mx-auto px-4">
       <form class="grid grid-cols-1 md:grid-cols-4 gap-5">
         <!-- lokalizacja -->
-        <div 
-          class="relative w-full text-left bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-        >
-          <span class="block text-xs text-gray-500 mb-1.5">Lokalizacja</span>
-          <input
-            type="text"
-            placeholder="Gdzie chcesz nocować?"
-            class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0"
-          />
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-600 mb-1">Lokalizacja</span>
+          <div 
+            class="relative w-full text-left bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors cursor-pointer"
+          >
+            <input
+              type="text"
+              placeholder="Gdzie chcesz nocować?"
+              class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0"
+            />
+          </div>
         </div>
 
         <!-- daty with improved gap -->
         <div class="col-span-2 grid grid-cols-2 gap-3">
           <!-- zameldowanie -->
-          <div
-            class="relative w-full text-left bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-            @click="openDatePicker('checkIn')"
-          >
-            <span class="block text-xs text-gray-500 mb-1.5">Zameldowanie</span>
-            <input
-              ref="checkInInput"
-              type="date"
-              v-model="checkInDate"
-              class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0"
-            />
+          <div class="flex flex-col">
+            <span class="text-sm text-gray-600 mb-1">Zameldowanie</span>
+            <div class="relative">
+              <!-- Ukryty input kalendarza -->
+              <input
+                ref="checkInInput"
+                type="date"
+                v-model="checkInDate"
+                :min="today"
+                :class="`absolute ${calendarPosition}`"
+                aria-hidden="true"
+              />
+              <!-- Widoczny przycisk -->
+              <button
+                type="button"
+                @click="openDatePicker('checkIn')"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md text-left bg-gray-50 hover:border-gray-400 transition-all cursor-pointer flex items-center justify-between"
+              >
+                <span :class="checkInDate ? 'text-gray-900' : 'text-gray-500'">
+                  {{ checkInDate ? formatDisplayDate(checkInDate) : 'Wybierz datę' }}
+                </span>
+                <i class="fas fa-calendar-alt text-gray-400"></i>
+              </button>
+            </div>
           </div>
 
           <!-- wymeldowanie -->
-          <div
-            class="relative w-full text-left bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-            @click="openDatePicker('checkOut')"
-          >
-            <span class="block text-xs text-gray-500 mb-1.5">Wymeldowanie</span>
-            <input
-              ref="checkOutInput"
-              type="date"
-              v-model="checkOutDate"
-              class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0"
-            />
+          <div class="flex flex-col">
+            <span class="text-sm text-gray-600 mb-1">Wymeldowanie</span>
+            <div class="relative">
+              <!-- Ukryty input kalendarza -->
+              <input
+                ref="checkOutInput"
+                type="date"
+                v-model="checkOutDate"
+                :min="checkInDate || today"
+                :class="`absolute ${calendarPosition}`"
+                aria-hidden="true"
+              />
+              <!-- Widoczny przycisk -->
+              <button
+                type="button"
+                @click="openDatePicker('checkOut')"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md text-left bg-gray-50 hover:border-gray-400 transition-all cursor-pointer flex items-center justify-between"
+              >
+                <span :class="checkOutDate ? 'text-gray-900' : 'text-gray-500'">
+                  {{ checkOutDate ? formatDisplayDate(checkOutDate) : 'Wybierz datę' }}
+                </span>
+                <i class="fas fa-calendar-alt text-gray-400"></i>
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- goscie -->
-        <div 
-          class="relative w-full text-left bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-          @click="openGuestsPicker"
-        >
-          <span class="block text-xs text-gray-500 mb-1.5">Liczba gości</span>
-          <select
-            ref="guestsInput"
-            v-model="selectedGuests"
-            class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0 appearance-none"
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-600 mb-1">Liczba gości</span>
+          <div 
+            class="relative w-full text-left bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors cursor-pointer"
+            @click="openGuestsPicker"
           >
-            <option 
-              v-for="option in guestOptions" 
-              :key="option" 
-              :value="option"
+            <select
+              ref="guestsInput"
+              v-model="selectedGuests"
+              class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0 appearance-none"
             >
-              {{ option }}
-            </option>
-          </select>
+              <option 
+                v-for="option in guestOptions" 
+                :key="option" 
+                :value="option"
+              >
+                {{ option }}
+              </option>
+            </select>
+          </div>
         </div>
 
         <!-- search button with improved spacing -->
@@ -125,3 +198,25 @@ const guestOptions = [
     </div>
   </section>
 </template>
+
+<style scoped>
+/* Ukryj domyślne formatowanie daty */
+input[type="date"]::-webkit-datetime-edit {
+  opacity: 0;
+}
+
+/* Pokaż ikonę kalendarza */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+/* Styl dla inputa */
+input[type="date"] {
+  min-height: 24px;
+}
+</style>
