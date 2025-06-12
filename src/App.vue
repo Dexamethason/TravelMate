@@ -1,47 +1,44 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import AppNavigation from './components/layout/AppNavigation.vue'
+import AppFooter from './components/layout/AppFooter.vue'
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
+  <div class="min-w-[250px] flex flex-col min-h-screen">
+    <!-- Komponent nawigacyjny - szerokość 100% -->
+    <AppNavigation />
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-    </div>
-  </header>
+    <!-- Główny obszar treści z widokiem routera - pełna szerokość -->
+    <main class="w-full flex-grow">
+      <router-view />
+    </main>
 
-  <main>
-    <TheWelcome />
-  </main>
+    <!-- Footer -->
+    <AppFooter class="mt-0" />
+  </div>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
+<style>
+/* Globalna blokada poziomego przewijania */
+html,
+body {
+  background-color: #f0f9ff;
+  font-family: 'Inter', sans-serif;
+  min-width: 250px;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+/* Zapobiegaj poziomemu przewijaniu na wszystkich elementach */
+* {
+  margin-block-end: 0;
+  margin-block-start: 0;
+  box-sizing: border-box;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+/* Dodatkowa kontrola szerokości */
+body {
+  max-width: 100vw;
 }
 </style>
