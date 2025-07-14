@@ -1,206 +1,331 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import { popularDestinations, popularOrigins } from '@/mock/mockFlights'
 
-// Typ podróży - 'roundtrip' (w obie strony) lub 'oneway' (w jedną stronę)
-// Domyślnie 'oneway' (w jedną stronę)
-const tripType = ref('oneway')
+// Union types dla lepszego typowania
+type TripType = 'oneway' | 'roundtrip'
+type NotificationType = 'error' | 'success' | 'warning'
 
-// Dane formularza
-const fromInput = ref('')
-const toInput = ref('')
-const departDate = ref('')
-const returnDate = ref('')
-const passengers = ref(1)
-
-// Autouzupełnianie
-const showFromSuggestions = ref(false)
-const showToSuggestions = ref(false)
-
-// Filtrowane podpowiedzi
-const fromSuggestions = computed(() => {
-  if (!fromInput.value) return []
-  const searchTerm = fromInput.value.toLowerCase()
-  return popularOrigins.filter(
-    (city) =>
-      city.name.toLowerCase().includes(searchTerm) || city.code.toLowerCase().includes(searchTerm),
-  )
-})
-
-const toSuggestions = computed(() => {
-  if (!toInput.value) return []
-  const searchTerm = toInput.value.toLowerCase()
-  return popularDestinations.filter(
-    (city) =>
-      city.name.toLowerCase().includes(searchTerm) || city.code.toLowerCase().includes(searchTerm),
-  )
-})
-
-// Obsługa wyboru podpowiedzi
-const selectFromSuggestion = (suggestion: { code: string; name: string }) => {
-  fromInput.value = `${suggestion.name} (${suggestion.code})`
-  showFromSuggestions.value = false
+// Interface dla destynacji/pochodzenia
+interface CityDestination {
+  code: string
+  name: string
+  country?: string
 }
 
-const selectToSuggestion = (suggestion: { code: string; name: string }) => {
-  toInput.value = `${suggestion.name} (${suggestion.code})`
-  showToSuggestions.value = false
+// Interface dla stanu notyfikacji
+interface NotificationState {
+  show: boolean
+  message: string
+  type: NotificationType
 }
 
-// Obsługa zdarzenia utraty fokusu
-const hideFromSuggestions = () => {
-  setTimeout(() => {
-    showFromSuggestions.value = false
-  }, 200)
+// Interface dla danych wyszukiwania lotów
+interface FlightSearchData {
+  from: string
+  to: string
+  departDate: string
+  returnDate: string | null
+  passengers: number
+  tripType: TripType
 }
 
-const hideToSuggestions = () => {
-  setTimeout(() => {
-    showToSuggestions.value = false
-  }, 200)
+// Interface dla eventów emitowanych przez komponent
+interface FlightSearchFormEmits {
+  (event: 'search', data: FlightSearchData): void
 }
 
-// Zarządzanie liczbą pasażerów
-const incrementPassengers = () => {
-  if (passengers.value < 9) passengers.value++
-}
+// Definicja emitów
+const emit = defineEmits<FlightSearchFormEmits>()
 
-const decrementPassengers = () => {
-  if (passengers.value > 1) passengers.value--
-}
+// Stan komponentu z typowaniem
+const tripType = ref<TripType>('oneway')
+const fromInput = ref<string>('')
+const toInput = ref<string>('')
+const departDate = ref<string>('')
+const returnDate = ref<string>('')
+const passengers = ref<number>(1)
 
-// System notyfikacji
-const notification = ref({
+// Stan autouzupełniania
+const showFromSuggestions = ref<boolean>(false)
+const showToSuggestions = ref<boolean>(false)
+
+// Stan wyszukiwania i notyfikacji
+const isSearching = ref<boolean>(false)
+const notification = ref<NotificationState>({
   show: false,
   message: '',
   type: 'error',
 })
 
-// Funkcja do pokazywania notyfikacji
-const showNotification = (message: string, type: 'error' | 'success' | 'warning' = 'error') => {
+// Template refs z typowaniem
+const departDateInput = ref<HTMLInputElement | null>(null)
+const returnDateInput = ref<HTMLInputElement | null>(null)
+
+// Timeouts dla cleanup
+let notificationTimeout: ReturnType<typeof setTimeout> | null = null
+let fromSuggestionsTimeout: ReturnType<typeof setTimeout> | null = null
+let toSuggestionsTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Computed properties z typowaniem
+const fromSuggestions = computed<CityDestination[]>(() => {
+  if (!fromInput.value) return []
+  const searchTerm = fromInput.value.toLowerCase()
+  return popularOrigins.filter(
+    (city: CityDestination) =>
+      city.name.toLowerCase().includes(searchTerm) || city.code.toLowerCase().includes(searchTerm),
+  )
+})
+
+const toSuggestions = computed<CityDestination[]>(() => {
+  if (!toInput.value) return []
+  const searchTerm = toInput.value.toLowerCase()
+  return popularDestinations.filter(
+    (city: CityDestination) =>
+      city.name.toLowerCase().includes(searchTerm) || city.code.toLowerCase().includes(searchTerm),
+  )
+})
+
+// Dzisiejsza data dla walidacji
+const today = computed<string>(() => new Date().toISOString().split('T')[0])
+
+// Pozycja kalendarza responsywna
+const calendarPosition = ref<string>('')
+
+// Type guards dla walidacji
+const isValidDate = (dateString: string): boolean => {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  return !isNaN(date.getTime()) && date >= new Date(today.value)
+}
+
+const isValidTripType = (type: string): type is TripType => {
+  return ['oneway', 'roundtrip'].includes(type)
+}
+
+const isValidPassengerCount = (count: number): boolean => {
+  return Number.isInteger(count) && count >= 1 && count <= 9
+}
+
+// Funkcje obsługi sugestii z typowaniem
+const selectFromSuggestion = (suggestion: CityDestination): void => {
+  fromInput.value = `${suggestion.name} (${suggestion.code})`
+  showFromSuggestions.value = false
+}
+
+const selectToSuggestion = (suggestion: CityDestination): void => {
+  toInput.value = `${suggestion.name} (${suggestion.code})`
+  showToSuggestions.value = false
+}
+
+// Funkcje ukrywania sugestii z cleanup
+const hideFromSuggestions = (): void => {
+  if (fromSuggestionsTimeout) {
+    clearTimeout(fromSuggestionsTimeout)
+  }
+  fromSuggestionsTimeout = setTimeout(() => {
+    showFromSuggestions.value = false
+  }, 200)
+}
+
+const hideToSuggestions = (): void => {
+  if (toSuggestionsTimeout) {
+    clearTimeout(toSuggestionsTimeout)
+  }
+  toSuggestionsTimeout = setTimeout(() => {
+    showToSuggestions.value = false
+  }, 200)
+}
+
+// Zarządzanie liczbą pasażerów z walidacją
+const incrementPassengers = (): void => {
+  if (passengers.value < 9) {
+    passengers.value++
+  }
+}
+
+const decrementPassengers = (): void => {
+  if (passengers.value > 1) {
+    passengers.value--
+  }
+}
+
+// System notyfikacji z typowaniem
+const showNotification = (message: string, type: NotificationType = 'error'): void => {
   notification.value = {
     show: true,
     message,
     type,
   }
 
+  // Cleanup poprzedniego timeoutu
+  if (notificationTimeout) {
+    clearTimeout(notificationTimeout)
+  }
+
   // Automatyczne ukrycie po 4 sekundach
-  setTimeout(() => {
+  notificationTimeout = setTimeout(() => {
     notification.value.show = false
   }, 4000)
 }
 
-// Funkcja do ukrywania notyfikacji
-const hideNotification = () => {
+const hideNotification = (): void => {
   notification.value.show = false
+  if (notificationTimeout) {
+    clearTimeout(notificationTimeout)
+    notificationTimeout = null
+  }
 }
 
-// Funkcjonalność wyszukiwania
-const emit = defineEmits(['search'])
-
-const isSearching = ref(false)
-
-const handleSearch = () => {
-  if (
-    !fromInput.value ||
-    !toInput.value ||
-    !departDate.value ||
-    (tripType.value === 'roundtrip' && !returnDate.value)
-  ) {
-    showNotification('Proszę wypełnić wszystkie wymagane pola', 'warning')
-    return
+// Walidacja formularza z lepszym typowaniem
+const validateForm = (): { isValid: boolean; error?: string } => {
+  if (!fromInput.value.trim()) {
+    return { isValid: false, error: 'Proszę wybrać miejsce wylotu' }
   }
 
-  // Walidacja dat
-  if (tripType.value === 'roundtrip' && returnDate.value && departDate.value) {
+  if (!toInput.value.trim()) {
+    return { isValid: false, error: 'Proszę wybrać miejsce przylotu' }
+  }
+
+  // POPRAWKA: Walidacja kodów IATA
+  const fromCode = extractIATACode(fromInput.value)
+  const toCode = extractIATACode(toInput.value)
+
+  if (!fromCode || fromCode.length !== 3) {
+    return { isValid: false, error: 'Nieprawidłowy format miejsca wylotu' }
+  }
+
+  if (!toCode || toCode.length !== 3) {
+    return { isValid: false, error: 'Nieprawidłowy format miejsca przylotu' }
+  }
+
+  if (fromCode === toCode) {
+    return { isValid: false, error: 'Miejsce wylotu i przylotu nie mogą być takie same' }
+  }
+
+  if (!isValidDate(departDate.value)) {
+    return { isValid: false, error: 'Proszę wybrać poprawną datę wylotu' }
+  }
+
+  if (tripType.value === 'roundtrip') {
+    if (!isValidDate(returnDate.value)) {
+      return { isValid: false, error: 'Proszę wybrać poprawną datę powrotu' }
+    }
+
     const departureDate = new Date(departDate.value)
     const returnDateObj = new Date(returnDate.value)
 
     if (returnDateObj < departureDate) {
-      showNotification('Data powrotu nie może być wcześniejsza niż data wylotu', 'error')
-      return
+      return { isValid: false, error: 'Data powrotu nie może być wcześniejsza niż data wylotu' }
     }
+  }
+
+  if (!isValidPassengerCount(passengers.value)) {
+    return { isValid: false, error: 'Nieprawidłowa liczba pasażerów' }
+  }
+
+  return { isValid: true }
+}
+
+// Funkcja ekstraktowania kodu IATA z tekstu
+const extractIATACode = (input: string): string => {
+  if (!input) return ''
+
+  // Sprawdź czy tekst zawiera kod w nawiasach np. "Kraków (KRK)"
+  const match = input.match(/\(([A-Z]{3})\)/)
+  if (match && match[1]) {
+    return match[1]
+  }
+
+  // Sprawdź czy to jest bezpośrednio kod IATA (3 litery)
+  const trimmed = input.trim().toUpperCase()
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    return trimmed
+  }
+
+  // Fallback - zwróć pierwsze 3 znaki (dla przypadków gdy użytkownik wpisuje tylko nazwę)
+  return trimmed.substring(0, 3)
+}
+
+// Główna funkcja wyszukiwania z typowaniem
+const handleSearch = (): void => {
+  const validation = validateForm()
+
+  if (!validation.isValid) {
+    showNotification(validation.error!, 'warning')
+    return
   }
 
   // Rozpocznij loading
   isSearching.value = true
 
-  emit('search', {
-    from: fromInput.value,
-    to: toInput.value,
+  // POPRAWKA: Ekstraktuj kody IATA z pełnych nazw
+  const fromCode = extractIATACode(fromInput.value)
+  const toCode = extractIATACode(toInput.value)
+
+  // Walidacja kodów IATA
+  if (!fromCode || fromCode.length !== 3) {
+    showNotification('Nieprawidłowy kod lotniska wylotu', 'error')
+    isSearching.value = false
+    return
+  }
+
+  if (!toCode || toCode.length !== 3) {
+    showNotification('Nieprawidłowy kod lotniska przylotu', 'error')
+    isSearching.value = false
+    return
+  }
+
+  const searchData: FlightSearchData = {
+    from: fromCode, // POPRAWKA: Używaj wyekstraktowanego kodu
+    to: toCode, // POPRAWKA: Używaj wyekstraktowanego kodu
     departDate: departDate.value,
     returnDate: tripType.value === 'roundtrip' ? returnDate.value : null,
     passengers: passengers.value,
     tripType: tripType.value,
-  })
+  }
 
-  // Symulacja czasu wyszukiwania - w rzeczywistości zakończy się po otrzymaniu odpowiedzi
+  emit('search', searchData)
+
+  // Symulacja czasu wyszukiwania
   setTimeout(() => {
     isSearching.value = false
   }, 2000)
 }
 
-// Dzisiejsza data do ograniczenia minimalnej wartości
-const today = new Date().toISOString().split('T')[0]
-
-// Referencje do ukrytych inputów kalendarza
-const departDateInput = ref<HTMLInputElement>()
-const returnDateInput = ref<HTMLInputElement>()
-
-// Funkcja do określenia optymalnej pozycji kalendarza
-const getOptimalCalendarPosition = () => {
+// Funkcje kalendarza z typowaniem
+const getOptimalCalendarPosition = (): string => {
   const screenWidth = window.innerWidth
 
   if (screenWidth < 768) {
-    // Małe ekrany
     return 'inset-0 opacity-0 pointer-events-none'
   } else {
-    // Większe ekrany
     return 'left-4 top-1/2 transform -translate-y-1/2 opacity-0 pointer-events-none w-0 h-0 z-0'
   }
 }
 
-// Reaktywna pozycja kalendarza
-const calendarPosition = ref(getOptimalCalendarPosition())
-
-// Nasłuchiwanie zmiany rozmiaru okna
-const updateCalendarPosition = () => {
+const updateCalendarPosition = (): void => {
   calendarPosition.value = getOptimalCalendarPosition()
 }
 
-// Dodaj event listener w onMounted
-import { onMounted, onBeforeUnmount } from 'vue'
-
-onMounted(() => {
-  window.addEventListener('resize', updateCalendarPosition)
-  updateCalendarPosition()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateCalendarPosition)
-})
-
-// Funkcje otwierania kalendarzy
-const openDepartCalendar = () => {
+const openDepartCalendar = (): void => {
   if (departDateInput.value) {
-    // Zaktualizuj pozycję przed otwarciem
     updateCalendarPosition()
     departDateInput.value.showPicker()
   }
 }
 
-const openReturnCalendar = () => {
+const openReturnCalendar = (): void => {
   if (returnDateInput.value) {
-    // Zaktualizuj pozycję przed otwarciem
     updateCalendarPosition()
     returnDateInput.value.showPicker()
   }
 }
 
-// Formatowanie daty do wyświetlenia
-const formatDisplayDate = (dateString: string) => {
-  if (!dateString) return ''
+// Formatowanie daty z lepszym typowaniem
+const formatDisplayDate = (dateString: string): string => {
+  if (!dateString || !isValidDate(dateString)) return ''
 
   const date = new Date(dateString)
   const options: Intl.DateTimeFormatOptions = {
@@ -210,6 +335,77 @@ const formatDisplayDate = (dateString: string) => {
   }
 
   return date.toLocaleDateString('pl-PL', options)
+}
+
+// Event handlers z typowaniem
+const handleFromFocus = (): void => {
+  showFromSuggestions.value = true
+}
+
+const handleToFocus = (): void => {
+  showToSuggestions.value = true
+}
+
+const handleSuggestionKeydown = (
+  event: KeyboardEvent,
+  suggestion: CityDestination,
+  type: 'from' | 'to',
+): void => {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (type === 'from') {
+      selectFromSuggestion(suggestion)
+    } else {
+      selectToSuggestion(suggestion)
+    }
+  }
+}
+
+// Lifecycle hooks z cleanup
+onMounted((): void => {
+  window.addEventListener('resize', updateCalendarPosition)
+  updateCalendarPosition()
+})
+
+onBeforeUnmount((): void => {
+  window.removeEventListener('resize', updateCalendarPosition)
+
+  // Cleanup timeouts
+  if (notificationTimeout) clearTimeout(notificationTimeout)
+  if (fromSuggestionsTimeout) clearTimeout(fromSuggestionsTimeout)
+  if (toSuggestionsTimeout) clearTimeout(toSuggestionsTimeout)
+})
+
+// Expose funkcji dla parent component
+defineExpose({
+  validateForm,
+  resetForm: (): void => {
+    fromInput.value = ''
+    toInput.value = ''
+    departDate.value = ''
+    returnDate.value = ''
+    passengers.value = 1
+    tripType.value = 'oneway'
+    hideNotification()
+  },
+  showNotification,
+  isValid: computed(() => validateForm().isValid),
+})
+
+// Walidacja przy developmencie
+if (import.meta.env.DEV) {
+  // Sprawdzenie czy mock data ma właściwą strukturę
+  popularOrigins.forEach((city, index) => {
+    if (!city.code || !city.name) {
+      console.warn(`FlightSearchForm: Nieprawidłowa struktura origin city na pozycji ${index}`)
+    }
+  })
+
+  popularDestinations.forEach((city, index) => {
+    if (!city.code || !city.name) {
+      console.warn(`FlightSearchForm: Nieprawidłowa struktura destination city na pozycji ${index}`)
+    }
+  })
 }
 </script>
 
@@ -232,6 +428,8 @@ const formatDisplayDate = (dateString: string) => {
           'border-l-4 border-yellow-500': notification.type === 'warning',
           'border-l-4 border-green-500': notification.type === 'success',
         }"
+        role="alert"
+        aria-live="assertive"
       >
         <div class="p-3 sm:p-4">
           <div class="flex items-start">
@@ -243,6 +441,7 @@ const formatDisplayDate = (dateString: string) => {
                   'fas fa-exclamation-triangle text-yellow-500': notification.type === 'warning',
                   'fas fa-check-circle text-green-500': notification.type === 'success',
                 }"
+                aria-hidden="true"
               ></i>
             </div>
             <div class="ml-2 sm:ml-3 flex-1 pt-0.5">
@@ -250,6 +449,13 @@ const formatDisplayDate = (dateString: string) => {
                 {{ notification.message }}
               </p>
             </div>
+            <button
+              @click="hideNotification"
+              class="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
+              aria-label="Zamknij notyfikację"
+            >
+              <i class="fas fa-times"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -326,15 +532,16 @@ const formatDisplayDate = (dateString: string) => {
           v-model="fromInput"
           placeholder="Miasto lub lotnisko"
           class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 transition-all"
-          @focus="showFromSuggestions = true"
+          @focus="handleFromFocus"
           @blur="hideFromSuggestions"
           aria-label="Miejsce wylotu"
           aria-describedby="fromHint"
+          autocomplete="off"
         />
         <p id="fromHint" class="sr-only">Wprowadź nazwę miasta lub kod lotniska</p>
         <div
           v-if="showFromSuggestions && fromSuggestions.length > 0"
-          class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden"
+          class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden border border-gray-200"
           role="listbox"
           aria-label="Sugestie miejsc wylotu"
         >
@@ -343,12 +550,18 @@ const formatDisplayDate = (dateString: string) => {
               v-for="suggestion in fromSuggestions"
               :key="suggestion.code"
               @mousedown="selectFromSuggestion(suggestion)"
-              class="px-4 py-2 hover:bg-gray-100 cursor-pointer focus-within:bg-primary-50"
+              @keydown="(e: KeyboardEvent) => handleSuggestionKeydown(e, suggestion, 'from')"
+              class="px-4 py-2 hover:bg-gray-100 cursor-pointer focus-within:bg-primary-50 border-b border-gray-100 last:border-b-0"
               role="option"
               tabindex="0"
-              @keydown.enter="selectFromSuggestion(suggestion)"
             >
-              {{ suggestion.name }} ({{ suggestion.code }})
+              <div class="flex justify-between items-center">
+                <span class="font-medium text-gray-900">{{ suggestion.name }}</span>
+                <span class="text-sm text-gray-500">{{ suggestion.code }}</span>
+              </div>
+              <div v-if="suggestion.country" class="text-xs text-gray-400">
+                {{ suggestion.country }}
+              </div>
             </li>
           </ul>
         </div>
@@ -363,15 +576,16 @@ const formatDisplayDate = (dateString: string) => {
           v-model="toInput"
           placeholder="Miasto lub lotnisko"
           class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 transition-all"
-          @focus="showToSuggestions = true"
+          @focus="handleToFocus"
           @blur="hideToSuggestions"
           aria-label="Miejsce przylotu"
           aria-describedby="toHint"
+          autocomplete="off"
         />
         <p id="toHint" class="sr-only">Wprowadź nazwę miasta lub kod lotniska</p>
         <div
           v-if="showToSuggestions && toSuggestions.length > 0"
-          class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden"
+          class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden border border-gray-200"
           role="listbox"
           aria-label="Sugestie miejsc przylotu"
         >
@@ -380,12 +594,18 @@ const formatDisplayDate = (dateString: string) => {
               v-for="suggestion in toSuggestions"
               :key="suggestion.code"
               @mousedown="selectToSuggestion(suggestion)"
-              class="px-4 py-2 hover:bg-gray-100 cursor-pointer focus-within:bg-primary-50"
+              @keydown="(e: KeyboardEvent) => handleSuggestionKeydown(e, suggestion, 'to')"
+              class="px-4 py-2 hover:bg-gray-100 cursor-pointer focus-within:bg-primary-50 border-b border-gray-100 last:border-b-0"
               role="option"
               tabindex="0"
-              @keydown.enter="selectToSuggestion(suggestion)"
             >
-              {{ suggestion.name }} ({{ suggestion.code }})
+              <div class="flex justify-between items-center">
+                <span class="font-medium text-gray-900">{{ suggestion.name }}</span>
+                <span class="text-sm text-gray-500">{{ suggestion.code }}</span>
+              </div>
+              <div v-if="suggestion.country" class="text-xs text-gray-400">
+                {{ suggestion.country }}
+              </div>
             </li>
           </ul>
         </div>
@@ -413,11 +633,12 @@ const formatDisplayDate = (dateString: string) => {
             @click="openDepartCalendar"
             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 transition-all text-left bg-white hover:border-gray-400 cursor-pointer flex items-center justify-between relative z-10"
             aria-label="Wybierz datę wylotu"
+            :aria-expanded="false"
           >
             <span :class="departDate ? 'text-gray-900' : 'text-gray-500'">
               {{ departDate ? formatDisplayDate(departDate) : 'Wybierz datę wylotu' }}
             </span>
-            <i class="fas fa-calendar-alt text-gray-400"></i>
+            <i class="fas fa-calendar-alt text-gray-400" aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -444,45 +665,46 @@ const formatDisplayDate = (dateString: string) => {
             @click="openReturnCalendar"
             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 transition-all text-left bg-white hover:border-gray-400 cursor-pointer flex items-center justify-between relative z-10"
             aria-label="Wybierz datę powrotu"
+            :aria-expanded="false"
           >
             <span :class="returnDate ? 'text-gray-900' : 'text-gray-500'">
               {{ returnDate ? formatDisplayDate(returnDate) : 'Wybierz datę powrotu' }}
             </span>
-            <i class="fas fa-calendar-alt text-gray-400"></i>
+            <i class="fas fa-calendar-alt text-gray-400" aria-hidden="true"></i>
           </button>
         </div>
       </div>
 
-      <!-- Pasażerowie (widoczne gdy w jedną stronę lub w widoku mobilnym) -->
+      <!-- Pasażerowie -->
       <div v-if="tripType === 'oneway' || true" class="md:col-span-2 lg:col-span-1">
         <label for="passengers" class="block text-sm font-medium text-gray-700 mb-1"
           >Pasażerowie</label
         >
         <div
           class="flex border border-gray-300 rounded-md overflow-hidden transition-all hover:border-gray-400 focus-within:border-primary-500"
+          role="group"
+          aria-labelledby="passengersLabel"
         >
           <button
             @click="decrementPassengers"
             type="button"
-            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:bg-gray-200 transition-colors cursor-pointer"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="passengers <= 1"
             aria-label="Zmniejsz liczbę pasażerów"
           >
-            <span class="sr-only">Zmniejsz liczbę pasażerów</span>
             <i class="fas fa-minus text-gray-600" aria-hidden="true"></i>
           </button>
-          <div class="flex-1 flex items-center justify-center" aria-live="polite">
-            <span>{{ passengers }}</span>
+          <div class="flex-1 flex items-center justify-center bg-white" aria-live="polite">
+            <span class="font-medium">{{ passengers }}</span>
             <span class="sr-only">{{ passengers === 1 ? 'pasażer' : 'pasażerów' }}</span>
           </div>
           <button
             @click="incrementPassengers"
             type="button"
-            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:bg-gray-200 transition-colors cursor-pointer"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="passengers >= 9"
             aria-label="Zwiększ liczbę pasażerów"
           >
-            <span class="sr-only">Zwiększ liczbę pasażerów</span>
             <i class="fas fa-plus text-gray-600" aria-hidden="true"></i>
           </button>
         </div>
@@ -497,13 +719,21 @@ const formatDisplayDate = (dateString: string) => {
         class="px-6 sm:px-8 py-2.5 sm:py-3 text-base sm:text-lg w-full sm:w-auto"
         :disabled="isSearching"
         @click="handleSearch"
+        :aria-label="isSearching ? 'Wyszukiwanie w toku' : 'Rozpocznij wyszukiwanie lotów'"
       >
-        <span v-if="!isSearching">Szukaj lotów</span>
-        <span v-else class="flex items-center">
-          <i class="fas fa-spinner fa-spin mr-2"></i>
+        <span v-if="!isSearching" class="flex items-center justify-center gap-2">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          Szukaj lotów
+        </span>
+        <span v-else class="flex items-center justify-center gap-2">
+          <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
           Szukam...
         </span>
       </AnimatedButton>
+
+      <p class="text-xs text-gray-500 mt-2 text-center max-w-sm">
+        Wyszukamy najlepsze oferty lotów dostępne w wybranym terminie
+      </p>
     </div>
   </div>
 </template>
@@ -513,7 +743,9 @@ const formatDisplayDate = (dateString: string) => {
 .fade-leave-active {
   transition: opacity 0.4s ease;
 }
-.fade-enter, .fade-leave-to {
+
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
@@ -526,5 +758,16 @@ const formatDisplayDate = (dateString: string) => {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Ukrywanie spinnerów w date inputs */
+input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+input[type='date']::-webkit-inner-spin-button,
+input[type='date']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 </style>

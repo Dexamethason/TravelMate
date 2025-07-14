@@ -1,42 +1,107 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, readonly } from 'vue'
 
-interface Props {
-  filters: {
-    priceRange: [number, number]
-    durationMax: number
-    stops: {
-      direct: boolean
-      oneStop: boolean
-      multiStop: boolean
-    }
-    airlines: string[]
-    availableAirlines?: string[]
-  }
+// POPRAWKA: Import typów z flights.ts zamiast filters.ts
+import type { FlightFilterState } from '@/types/flights'
+
+// Typy pomocnicze
+type StopType = 'direct' | 'oneStop' | 'multiStop'
+type SliderType = 'min' | 'max' | null
+type AirlineCode = string
+
+// Interface dla struktury przesiadek
+interface StopsFilter {
+  direct: boolean
+  oneStop: boolean
+  multiStop: boolean
+}
+
+// Props komponentu
+interface FlightFilterSidebarProps {
+  filters: FlightFilterState
   minPrice: number
   maxPrice: number
   maxDuration: number
   currency?: string
 }
 
-const props = withDefaults(defineProps<Props>(), {
+// Eventy emitowane przez komponent
+interface FlightFilterSidebarEmits {
+  (event: 'update:filters', filters: FlightFilterState): void
+}
+
+// Props z domyślnymi wartościami
+const props = withDefaults(defineProps<FlightFilterSidebarProps>(), {
   currency: 'EUR',
 })
-const emit = defineEmits(['update:filters'])
 
-// Lokalny stan filtrów z reactive refs
-const localFilters = ref({
+// Definicja emitów
+const emit = defineEmits<FlightFilterSidebarEmits>()
+
+// Stan komponentu z typowaniem
+const localFilters = ref<FlightFilterState>({
   priceRange: [...props.filters.priceRange] as [number, number],
   durationMax: props.filters.durationMax,
   stops: { ...props.filters.stops },
   airlines: [...props.filters.airlines],
 })
 
+const activeSlider = ref<SliderType>(null)
 let isUpdatingFromProps = false
+let emitTimeout: ReturnType<typeof setTimeout> | null = null
+let isEmitting = false
 
+// Mapowanie kodów linii lotniczych na nazwy
+const airlineNameMap: Readonly<Record<string, string>> = {
+  LO: 'LOT Polish Airlines',
+  FR: 'Ryanair',
+  LH: 'Lufthansa',
+  W6: 'Wizz Air',
+  KL: 'KLM',
+  AF: 'Air France',
+  U2: 'EasyJet',
+  LX: 'Swiss International Air Lines',
+  BA: 'British Airways',
+  IB: 'Iberia',
+  VY: 'Vueling',
+  OS: 'Austrian Airlines',
+  SN: 'Brussels Airlines',
+  AZ: 'ITA Airways',
+  TK: 'Turkish Airlines',
+  QR: 'Qatar Airways',
+  EK: 'Emirates',
+  AC: 'Air Canada',
+  UA: 'United Airlines',
+  DL: 'Delta Air Lines',
+  AA: 'American Airlines',
+  WF: 'Widerøe',
+  SK: 'SAS Scandinavian Airlines',
+  AY: 'Finnair',
+  BT: 'Air Baltic',
+  TP: 'TAP Air Portugal',
+  EN: 'Air Dolomiti',
+  LG: 'Luxair',
+} as const
+
+// Type guard dla sprawdzania typu przesiadki
+const isValidStopType = (type: string): type is StopType => {
+  return ['direct', 'oneStop', 'multiStop'].includes(type)
+}
+
+// Type guard dla walidacji zakresu ceny
+const isValidPriceRange = (range: [number, number]): boolean => {
+  return range[0] >= props.minPrice && range[1] <= props.maxPrice && range[0] <= range[1]
+}
+
+// Type guard dla walidacji czasu lotu
+const isValidDuration = (duration: number): boolean => {
+  return duration >= 60 && duration <= props.maxDuration
+}
+
+// Watch dla synchronizacji z props
 watch(
   () => props.filters,
-  async (newFilters) => {
+  async (newFilters: FlightFilterState): Promise<void> => {
     if (isUpdatingFromProps) return
 
     isUpdatingFromProps = true
@@ -52,10 +117,9 @@ watch(
   },
   { deep: true },
 )
-let emitTimeout: ReturnType<typeof setTimeout> | null = null
-let isEmitting = false
 
-const emitFilterChange = () => {
+// Funkcja emitowania zmian z debounce
+const emitFilterChange = (): void => {
   if (isEmitting || isUpdatingFromProps) return
 
   if (emitTimeout) {
@@ -76,51 +140,56 @@ const emitFilterChange = () => {
   }, 150)
 }
 
-const handleDurationChange = (event: Event) => {
+// Handler zmiany czasu lotu
+const handleDurationChange = (event: Event): void => {
   if (isUpdatingFromProps) return
 
   const target = event.target as HTMLInputElement
   const newValue = parseInt(target.value)
 
-  if (!isNaN(newValue) && newValue !== localFilters.value.durationMax) {
+  if (
+    !isNaN(newValue) &&
+    isValidDuration(newValue) &&
+    newValue !== localFilters.value.durationMax
+  ) {
     localFilters.value.durationMax = newValue
     emitFilterChange()
   }
 }
 
-const updatePrice = (event: Event) => {
-  if (isUpdatingFromProps) return
+// Handler aktualizacji ceny
+const updatePrice = (event: Event): void => {
+  if (isUpdatingFromProps || !activeSlider.value) return
 
   const target = event.target as HTMLInputElement
   const newValue = parseInt(target.value)
 
+  if (isNaN(newValue)) return
+
+  const newRange: [number, number] = [...localFilters.value.priceRange]
+
   if (activeSlider.value === 'min') {
-    if (newValue <= localFilters.value.priceRange[1]) {
-      localFilters.value.priceRange[0] = newValue
-    } else {
-      localFilters.value.priceRange[0] = newValue
-      localFilters.value.priceRange[1] = newValue
-    }
+    newRange[0] = Math.min(newValue, newRange[1])
   } else if (activeSlider.value === 'max') {
-    if (newValue >= localFilters.value.priceRange[0]) {
-      localFilters.value.priceRange[1] = newValue
-    } else {
-      localFilters.value.priceRange[1] = newValue
-      localFilters.value.priceRange[0] = newValue
-    }
+    newRange[1] = Math.max(newValue, newRange[0])
   }
 
-  emitFilterChange()
+  if (isValidPriceRange(newRange)) {
+    localFilters.value.priceRange = newRange
+    emitFilterChange()
+  }
 }
 
-const handleStopsChange = (type: 'direct' | 'oneStop' | 'multiStop', value: boolean) => {
-  if (isUpdatingFromProps) return
+// Handler zmiany filtrów przesiadek
+const handleStopsChange = (type: StopType, value: boolean): void => {
+  if (isUpdatingFromProps || !isValidStopType(type)) return
 
   localFilters.value.stops[type] = value
   emitFilterChange()
 }
 
-const handleAirlinesChange = (airline: string, event: Event) => {
+// Handler zmiany linii lotniczych
+const handleAirlinesChange = (airline: AirlineCode, event: Event): void => {
   if (isUpdatingFromProps) return
 
   const target = event.target as HTMLInputElement
@@ -129,11 +198,13 @@ const handleAirlinesChange = (airline: string, event: Event) => {
   const currentAirlines = [...localFilters.value.airlines]
 
   if (isChecked) {
+    // Usuń z listy wykluczonych (checkbox zaznaczony = linia jest włączona)
     const index = currentAirlines.indexOf(airline)
     if (index > -1) {
       currentAirlines.splice(index, 1)
     }
   } else {
+    // Dodaj do listy wykluczonych (checkbox odznaczony = linia jest wyłączona)
     if (!currentAirlines.includes(airline)) {
       currentAirlines.push(airline)
     }
@@ -143,27 +214,34 @@ const handleAirlinesChange = (airline: string, event: Event) => {
   emitFilterChange()
 }
 
-// Formatowanie bez side effects
-const formatDuration = (minutes: number) => {
+// Funkcje formatowania z typowaniem
+const formatDuration = (minutes: number): string => {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   return `${hours}h ${mins}m`
 }
 
-// formatowanie ceny używa waluty z props
-const formatPrice = (price: number) => {
+const formatPrice = (price: number): string => {
   return `${price.toFixed(2)} ${props.currency}`
 }
 
-// computed properties - eliminuje proxy errors
-const selectedAirlines = computed(() => {
+// Computed properties z typowaniem
+const availableAirlines = computed<AirlineCode[]>(() => {
+  const uniqueAirlines = [...new Set(props.filters.availableAirlines || [])]
+  return uniqueAirlines.length > 0 ? uniqueAirlines : []
+})
+
+const selectedAirlines = computed<AirlineCode[]>(() => {
   return [...localFilters.value.airlines]
 })
 
-// Stan aktywnego suwaka
-const activeSlider = ref<'min' | 'max' | null>(null)
+// Funkcja pobierania nazwy linii lotniczej
+const getAirlineDisplayName = (code: AirlineCode): string => {
+  return airlineNameMap[code] || code
+}
 
-const getPriceThumbPosition = (index: number) => {
+// Funkcje pozycjonowania sliderów z typowaniem
+const getPriceThumbPosition = (index: 0 | 1): number => {
   const minRange = props.minPrice
   const maxRange = props.maxPrice
   const range = maxRange - minRange
@@ -172,7 +250,7 @@ const getPriceThumbPosition = (index: number) => {
   return (value / range) * 100
 }
 
-const getDurationThumbPosition = () => {
+const getDurationThumbPosition = (): number => {
   const minRange = 60
   const maxRange = props.maxDuration
   const range = maxRange - minRange
@@ -181,8 +259,8 @@ const getDurationThumbPosition = () => {
   return (value / range) * 100
 }
 
-// Funkcje stylu bez reactive dependencies
-const getPriceRangeStyle = () => {
+// Funkcje stylów z typowaniem
+const getPriceRangeStyle = (): Record<string, string> => {
   const start = getPriceThumbPosition(0)
   const end = getPriceThumbPosition(1)
   return {
@@ -192,7 +270,7 @@ const getPriceRangeStyle = () => {
   }
 }
 
-const getDurationRangeStyle = () => {
+const getDurationRangeStyle = (): Record<string, string> => {
   const percentage = getDurationThumbPosition()
   return {
     left: '0%',
@@ -201,36 +279,40 @@ const getDurationRangeStyle = () => {
   }
 }
 
-const getPriceThumbLeftStyle = () => ({
+const getPriceThumbLeftStyle = (): Record<string, string> => ({
   left: `calc(${getPriceThumbPosition(0)}% - 12px)`,
   top: '-7px',
-  zIndex: activeSlider.value === 'min' ? 6 : 5,
+  zIndex: activeSlider.value === 'min' ? '6' : '5',
 })
 
-const getPriceThumbRightStyle = () => ({
+const getPriceThumbRightStyle = (): Record<string, string> => ({
   left: `calc(${getPriceThumbPosition(1)}% - 12px)`,
   top: '-7px',
-  zIndex: activeSlider.value === 'max' ? 6 : 5,
+  zIndex: activeSlider.value === 'max' ? '6' : '5',
 })
 
-const getDurationThumbStyle = () => ({
+const getDurationThumbStyle = (): Record<string, string> => ({
   left: `calc(${getDurationThumbPosition()}% - 12px)`,
   top: '-7px',
-  zIndex: 5,
+  zIndex: '5',
 })
 
-// Interakcja z suwakiem ceny
-const handleSliderInteraction = (event: MouseEvent | TouchEvent) => {
+// Handler interakcji ze sliderem ceny
+const handleSliderInteraction = (event: MouseEvent | TouchEvent): void => {
   if (isUpdatingFromProps) return
 
   const slider = event.currentTarget as HTMLElement
+  if (!slider) return
+
   const rect = slider.getBoundingClientRect()
 
   let clientX: number
   if (event instanceof MouseEvent) {
     clientX = event.clientX
-  } else {
+  } else if (event.touches && event.touches.length > 0) {
     clientX = event.touches[0].clientX
+  } else {
+    return
   }
 
   const clickPosition = (clientX - rect.left) / rect.width
@@ -243,56 +325,42 @@ const handleSliderInteraction = (event: MouseEvent | TouchEvent) => {
   activeSlider.value = distanceToMin < distanceToMax ? 'min' : 'max'
 }
 
-const resetActiveSlider = () => {
+const resetActiveSlider = (): void => {
   activeSlider.value = null
 }
 
+// Expose funkcji dla parent component
+defineExpose({
+  resetActiveSlider,
+  formatPrice: readonly(computed(() => formatPrice)),
+  formatDuration: readonly(computed(() => formatDuration)),
+})
+
 // Cleanup
-import { onBeforeUnmount } from 'vue'
-onBeforeUnmount(() => {
+onBeforeUnmount((): void => {
   if (emitTimeout) {
     clearTimeout(emitTimeout)
+    emitTimeout = null
   }
 })
 
-const availableAirlines = computed(() => {
-  const uniqueAirlines = [...new Set(props.filters.availableAirlines || [])]
-  return uniqueAirlines.length > 0 ? uniqueAirlines : []
-})
-
-// Funkcja do pobierania wyświetlanej nazwy linii lotniczej
-const getAirlineDisplayName = (code: string) => {
-  const airlineMap: Record<string, string> = {
-    LO: 'LOT Polish Airlines',
-    FR: 'Ryanair',
-    LH: 'Lufthansa',
-    W6: 'Wizz Air',
-    KL: 'KLM',
-    AF: 'Air France',
-    U2: 'EasyJet',
-    LX: 'Swiss International Air Lines',
-    BA: 'British Airways',
-    IB: 'Iberia',
-    VY: 'Vueling',
-    OS: 'Austrian Airlines',
-    SN: 'Brussels Airlines',
-    AZ: 'ITA Airways',
-    TK: 'Turkish Airlines',
-    QR: 'Qatar Airways',
-    EK: 'Emirates',
-    AC: 'Air Canada',
-    UA: 'United Airlines',
-    DL: 'Delta Air Lines',
-    AA: 'American Airlines',
-    WF: 'Widerøe',
-    SK: 'SAS Scandinavian Airlines',
-    AY: 'Finnair',
-    BT: 'Air Baltic',
-    TP: 'TAP Air Portugal',
-    EN: 'Air Dolomiti',
-    LG: 'Luxair',
+// Walidacja przy developmencie
+if (import.meta.env.DEV) {
+  if (props.minPrice >= props.maxPrice) {
+    console.warn('FlightFilterSidebar: minPrice musi być mniejszy od maxPrice')
   }
-  return airlineMap[code] || code
+
+  if (props.maxDuration <= 60) {
+    console.warn('FlightFilterSidebar: maxDuration musi być większy od 60 minut')
+  }
+
+  if (!isValidPriceRange(props.filters.priceRange)) {
+    console.warn('FlightFilterSidebar: Nieprawidłowy zakres ceny w props.filters')
+  }
+
+  if (!isValidDuration(props.filters.durationMax)) {
+    console.warn('FlightFilterSidebar: Nieprawidłowy czas lotu w props.filters')
+  }
 }
 </script>
 
@@ -320,16 +388,16 @@ const getAirlineDisplayName = (code: string) => {
             <div
               class="bg-white px-3 py-1.5 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
-              <span class="text-sm font-semibold text-primary-700">{{
-                formatPrice(localFilters.priceRange[0])
-              }}</span>
+              <span class="text-sm font-semibold text-primary-700">
+                {{ formatPrice(localFilters.priceRange[0]) }}
+              </span>
             </div>
             <div
               class="bg-white px-3 py-1.5 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
-              <span class="text-sm font-semibold text-primary-700">{{
-                formatPrice(localFilters.priceRange[1])
-              }}</span>
+              <span class="text-sm font-semibold text-primary-700">
+                {{ formatPrice(localFilters.priceRange[1]) }}
+              </span>
             </div>
           </div>
 
@@ -536,9 +604,9 @@ const getAirlineDisplayName = (code: string) => {
             <div
               class="bg-white px-4 py-2 rounded-lg shadow-sm ring-1 ring-primary-200 border border-primary-100"
             >
-              <span class="text-sm font-semibold text-primary-700"
-                >Do {{ formatDuration(localFilters.durationMax) }}</span
-              >
+              <span class="text-sm font-semibold text-primary-700">
+                Do {{ formatDuration(localFilters.durationMax) }}
+              </span>
             </div>
           </div>
 
@@ -576,6 +644,7 @@ const getAirlineDisplayName = (code: string) => {
       </div>
     </div>
 
+    <!-- Filtr linii lotniczych -->
     <div>
       <h4
         class="font-medium p-2 mb-3 sm:mb-4 flex items-center space-x-3"
@@ -614,7 +683,7 @@ const getAirlineDisplayName = (code: string) => {
                 <input
                   type="checkbox"
                   :checked="!localFilters.airlines.includes(airlineCode)"
-                  @change="(e) => handleAirlinesChange(airlineCode, e)"
+                  @change="(e: Event) => handleAirlinesChange(airlineCode, e)"
                   class="sr-only"
                   :id="`airline-${airlineCode}`"
                   :aria-label="getAirlineDisplayName(airlineCode)"

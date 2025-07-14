@@ -1,23 +1,112 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { useRouter, type RouteLocationRaw } from 'vue-router'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 
+// Typy dla zakładek w modal ustawień
+type TabType = 'region' | 'currency'
+
+// Interface dla elementów nawigacji
+interface NavigationItem {
+  label: string
+  to: RouteLocationRaw
+  path: string // Dla porównania z current route
+}
+
+// Interface dla opcji języka/regionu
+interface LanguageOption {
+  code: string
+  name: string
+  flag: string
+}
+
+// Interface dla opcji waluty
+interface CurrencyOption {
+  code: string
+  name: string
+  symbol: string
+}
+
+// Props komponentu (obecnie nieużywane, ale przygotowane na przyszłość)
+interface AppNavigationProps {
+  showAuthButtons?: boolean
+  showLanguageSelector?: boolean
+  logoText?: string
+  sticky?: boolean
+}
+
+// Eventy emitowane przez komponent
+interface AppNavigationEmits {
+  (event: 'auth-state-change', isLoggedIn: boolean): void
+  (event: 'language-change', language: LanguageOption): void
+  (event: 'currency-change', currency: CurrencyOption): void
+  (event: 'navigation-click', item: NavigationItem): void
+}
+
+// Props z domyślnymi wartościami
+const props = withDefaults(defineProps<AppNavigationProps>(), {
+  showAuthButtons: true,
+  showLanguageSelector: true,
+  logoText: 'TravelMate',
+  sticky: true,
+})
+
+// Definicja emitów
+const emit = defineEmits<AppNavigationEmits>()
+
 const router = useRouter()
-const isLoggedIn = ref(false)
-const isMobileMenuOpen = ref(false)
-const isLanguageCurrencyOpen = ref(false)
-const activeTab = ref('currency')
-const isScrolled = ref(false)
 
+// Stan komponentu z typowaniem
+const isLoggedIn = ref<boolean>(false)
+const isMobileMenuOpen = ref<boolean>(false)
+const isLanguageCurrencyOpen = ref<boolean>(false)
+const activeTab = ref<TabType>('currency')
+const isScrolled = ref<boolean>(false)
+
+// Template refs z proper typowaniem
 const currencyDropdownRef = ref<HTMLElement | null>(null)
-const currencyButtonRef = ref<HTMLElement | null>(null)
-const mobileButtonRef = ref<HTMLElement | null>(null)
+const currencyButtonRef = ref<HTMLButtonElement | null>(null)
+const mobileButtonRef = ref<HTMLButtonElement | null>(null)
 
-// Uproszczona kontrola przewijania - tylko pionowe gdy potrzebne
-const setBodyOverflow = (lockVertical: boolean) => {
-  // Poziome przewijanie zawsze zablokowane przez CSS globalny
-  // Kontrolujemy tylko pionowe przewijanie dla modal
+// Konfiguracja nawigacji z typowaniem
+const navigationItems: readonly NavigationItem[] = [
+  { label: 'Planer', to: { name: 'planner' }, path: '/planner' },
+  { label: 'Loty', to: { name: 'flights' }, path: '/flights' },
+  { label: 'Noclegi', to: { name: 'accommodations' }, path: '/accommodations' },
+  { label: 'Atrakcje', to: { name: 'attractions' }, path: '/attractions' },
+] as const
+
+// Opcje języków z typowaniem
+const languageOptions: readonly LanguageOption[] = [
+  { code: 'pl', name: 'Polski', flag: '🇵🇱' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+] as const
+
+// Opcje walut z typowaniem
+const currencyOptions: readonly CurrencyOption[] = [
+  { code: 'PLN', name: 'Polski Złoty', symbol: 'zł' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+] as const
+
+// Aktualnie wybrane opcje
+const selectedLanguage = ref<LanguageOption>(languageOptions[0])
+const selectedCurrency = ref<CurrencyOption>(currencyOptions[0])
+
+// Computed property dla obecnej kombinacji języka i waluty
+const currentDisplayText = computed<string>(() => {
+  return `${selectedLanguage.value.code.toUpperCase()} / ${selectedCurrency.value.code}`
+})
+
+// Type guard dla sprawdzania czy element jest w DOM
+const isElementInDOM = (element: HTMLElement | null): element is HTMLElement => {
+  return element !== null && element.isConnected
+}
+
+// Funkcja kontroli overflow z typowaniem
+const setBodyOverflow = (lockVertical: boolean): void => {
   if (lockVertical) {
     document.body.style.overflowY = 'hidden'
   } else {
@@ -25,8 +114,8 @@ const setBodyOverflow = (lockVertical: boolean) => {
   }
 }
 
-// Otwieranie hamburger menu
-const toggleMobileMenu = () => {
+// Handler toggle mobile menu z typowaniem
+const toggleMobileMenu = (): void => {
   if (isLanguageCurrencyOpen.value) {
     closeLanguageCurrency()
   }
@@ -35,11 +124,10 @@ const toggleMobileMenu = () => {
   setBodyOverflow(isMobileMenuOpen.value)
 }
 
-// Otwieranie okna wyboru języka i waluty
-const toggleLanguageCurrency = (fromMobile = false) => {
+// Handler toggle language/currency modal
+const toggleLanguageCurrency = (fromMobile: boolean = false): void => {
   if (fromMobile) {
     isMobileMenuOpen.value = false
-    // Delay zamknięcia menu
     setTimeout(() => {
       isLanguageCurrencyOpen.value = true
       setBodyOverflow(true)
@@ -50,90 +138,129 @@ const toggleLanguageCurrency = (fromMobile = false) => {
   }
 }
 
-// Zamykanie okienka z ustawieniami
-const closeLanguageCurrency = () => {
+// Handler zamykania modal ustawień
+const closeLanguageCurrency = (): void => {
   isLanguageCurrencyOpen.value = false
   setBodyOverflow(isMobileMenuOpen.value)
 }
 
-// Zmiana zakładki w ustawieniach
-const setActiveTab = (tab: string) => {
+// Handler zmiany zakładki z type safety
+const setActiveTab = (tab: TabType): void => {
   activeTab.value = tab
 }
 
-// Zamykanie okna po kliknięciu gdzieś obok
-const handleClickOutside = (event: MouseEvent) => {
+// Handler kliknięcia poza modal z proper typowaniem
+const handleClickOutside = (event: MouseEvent): void => {
   if (!isLanguageCurrencyOpen.value) return
 
-  const target = event.target as Node
+  const target = event.target as Node | null
+  if (!target) return
+
   const modalContent = currencyDropdownRef.value
   const currencyBtn = currencyButtonRef.value
   const mobileBtn = mobileButtonRef.value
 
-  if (
-    modalContent &&
-    !modalContent.contains(target) &&
-    ((currencyBtn && !currencyBtn.contains(target)) || !currencyBtn) &&
-    ((mobileBtn && !mobileBtn.contains(target)) || !mobileBtn)
-  ) {
+  const isClickInsideModal = modalContent && modalContent.contains(target)
+  const isClickOnCurrencyBtn = currencyBtn && currencyBtn.contains(target)
+  const isClickOnMobileBtn = mobileBtn && mobileBtn.contains(target)
+
+  if (!isClickInsideModal && !isClickOnCurrencyBtn && !isClickOnMobileBtn) {
     closeLanguageCurrency()
   }
 }
 
-// Obsługa przewijania
-const handleScroll = () => {
+// Handler scroll z typowaniem
+const handleScroll = (): void => {
   isScrolled.value = window.scrollY > 10
 }
 
-// Dodajemy listenery po pierwszym renderze
-onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside as EventListener)
-  window.addEventListener('scroll', handleScroll)
-
-  // Inicjalne wywołanie, żeby poprawnie ustawić stan przy pierwszym ładowaniu
-  handleScroll()
-
-  // Resetowanie scrolla przy zmianie strony
-  router.afterEach(() => {
-    setBodyOverflow(false)
-  })
-})
-
-// Usuwamy listenery przy zamykaniu komponentu
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside as EventListener)
-  window.removeEventListener('scroll', handleScroll)
-  setBodyOverflow(false)
-})
-
-// Logowanie i wylogowywanie
-const toggleLogin = () => {
+// Handler toggle login z emitowaniem eventu
+const toggleLogin = (): void => {
   if (isMobileMenuOpen.value) {
     isMobileMenuOpen.value = false
     setBodyOverflow(false)
   }
 
-  // Zmiana stanu i przekierowanie
   isLoggedIn.value = !isLoggedIn.value
+  emit('auth-state-change', isLoggedIn.value)
+
   if (isLoggedIn.value) {
     router.push('/')
   }
 }
 
-// Obsługa kliknięć w przyciski logowania
-const handleAuthClick = () => {
+// Handler kliknięć w przyciski auth
+const handleAuthClick = (): void => {
   if (isMobileMenuOpen.value) {
     isMobileMenuOpen.value = false
     setBodyOverflow(false)
   }
 }
 
-// Obsługa kliknięcia w logo
-const handleLogoClick = () => {
+// Handler kliknięcia w logo
+const handleLogoClick = (): void => {
   if (isMobileMenuOpen.value) {
     isMobileMenuOpen.value = false
     setBodyOverflow(false)
   }
+}
+
+// Handler wyboru języka
+const selectLanguage = (language: LanguageOption): void => {
+  selectedLanguage.value = language
+  emit('language-change', language)
+  closeLanguageCurrency()
+}
+
+// Handler wyboru waluty
+const selectCurrency = (currency: CurrencyOption): void => {
+  selectedCurrency.value = currency
+  emit('currency-change', currency)
+  closeLanguageCurrency()
+}
+
+// Handler kliknięcia w element nawigacji
+const handleNavigationClick = (item: NavigationItem): void => {
+  emit('navigation-click', item)
+  if (isMobileMenuOpen.value) {
+    isMobileMenuOpen.value = false
+    setBodyOverflow(false)
+  }
+}
+
+// Type guard dla walidacji tab type
+const isValidTabType = (tab: string): tab is TabType => {
+  return ['region', 'currency'].includes(tab)
+}
+
+// Lifecycle hooks z proper typowaniem
+onMounted((): void => {
+  document.addEventListener('mousedown', handleClickOutside)
+  window.addEventListener('scroll', handleScroll)
+
+  // Inicjalne wywołanie dla scroll state
+  handleScroll()
+
+  // Reset scroll przy zmianie route
+  router.afterEach(() => {
+    setBodyOverflow(false)
+  })
+})
+
+onBeforeUnmount((): void => {
+  document.removeEventListener('mousedown', handleClickOutside)
+  window.removeEventListener('scroll', handleScroll)
+  setBodyOverflow(false)
+})
+
+// Walidacja przy developmencie
+if (import.meta.env.DEV) {
+  // Sprawdzenie konfiguracji nawigacji
+  navigationItems.forEach((item, index) => {
+    if (!item.label || !item.to || !item.path) {
+      console.warn(`AppNavigation: Nieprawidłowy element nawigacji na pozycji ${index}`)
+    }
+  })
 }
 </script>
 
@@ -153,7 +280,7 @@ const handleLogoClick = () => {
               <span class="text-white font-bold text-sm xs:text-lg">TM</span>
             </div>
             <span class="ml-2 xs:ml-3 text-base xs:text-xl font-semibold text-gray-900 logo-text">
-              TravelMate
+              {{ logoText }}
             </span>
           </router-link>
         </div>
@@ -162,28 +289,13 @@ const handleLogoClick = () => {
         <nav class="hidden lg:flex items-center ml-4 lg:ml-8 flex-shrink">
           <div class="flex space-x-1 lg:space-x-6">
             <router-link
-              to="/planner"
+              v-for="item in navigationItems"
+              :key="item.path"
+              :to="item.to"
               class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
+              @click="handleNavigationClick(item)"
             >
-              Planer
-            </router-link>
-            <router-link
-              to="/flights"
-              class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
-            >
-              Loty
-            </router-link>
-            <router-link
-              to="/accommodations"
-              class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
-            >
-              Noclegi
-            </router-link>
-            <router-link
-              to="/attractions"
-              class="text-gray-700 hover:text-gray-900 px-3 lg:px-4 py-4 text-sm lg:text-base font-medium nav-link"
-            >
-              Atrakcje
+              {{ item.label }}
             </router-link>
           </div>
         </nav>
@@ -191,66 +303,68 @@ const handleLogoClick = () => {
         <!-- Przyciski prawej strony -->
         <div class="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4">
           <!-- Dropdown języka/waluty (tylko na desktop) -->
-          <div class="hidden lg:block relative currency-dropdown">
+          <div v-if="showLanguageSelector" class="hidden lg:block relative currency-dropdown">
             <button
               ref="currencyButtonRef"
               @click="toggleLanguageCurrency()"
               class="flex items-center text-sm lg:text-base text-gray-700 hover:text-gray-900 px-2 lg:px-2 py-2 cursor-pointer nav-link whitespace-nowrap"
             >
-              <span>PL / PLN</span>
+              <span>{{ currentDisplayText }}</span>
               <span class="text-xs ml-1">▼</span>
             </button>
           </div>
 
           <!-- Przyciski logowania -->
-          <template v-if="isLoggedIn">
-            <AnimatedButton
-              variant="secondary"
-              size="small"
-              @click="toggleLogin"
-              class="hidden md:inline-flex nav-btn auth-btn-desktop"
-            >
-              Wyloguj
-            </AnimatedButton>
-            <router-link
-              to="/profile"
-              @click="handleAuthClick"
-              class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer flex-shrink-0"
-            >
-              <i class="fas fa-user text-gray-600"></i>
-            </router-link>
-          </template>
-
-          <template v-else>
-            <!-- Przyciski na dużych ekranach -->
-            <div class="hidden md:flex space-x-2 lg:space-x-3">
+          <template v-if="showAuthButtons">
+            <template v-if="isLoggedIn">
               <AnimatedButton
                 variant="secondary"
                 size="small"
                 @click="toggleLogin"
-                class="nav-btn auth-btn px-3 py-2 text-sm"
+                class="hidden md:inline-flex nav-btn auth-btn-desktop"
               >
-                Zaloguj
+                Wyloguj
               </AnimatedButton>
-              <router-link to="/auth/register" @click="handleAuthClick">
+              <router-link
+                to="/profile"
+                @click="handleAuthClick"
+                class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-200 hover:bg-gray-300 cursor-pointer flex-shrink-0"
+              >
+                <i class="fas fa-user text-gray-600"></i>
+              </router-link>
+            </template>
+
+            <template v-else>
+              <!-- Przyciski na dużych ekranach -->
+              <div class="hidden md:flex space-x-2 lg:space-x-3">
                 <AnimatedButton
-                  variant="primary"
+                  variant="secondary"
                   size="small"
+                  @click="toggleLogin"
                   class="nav-btn auth-btn px-3 py-2 text-sm"
                 >
-                  Konto
+                  Zaloguj
                 </AnimatedButton>
-              </router-link>
-            </div>
+                <router-link to="/auth/register" @click="handleAuthClick">
+                  <AnimatedButton
+                    variant="primary"
+                    size="small"
+                    class="nav-btn auth-btn px-3 py-2 text-sm"
+                  >
+                    Konto
+                  </AnimatedButton>
+                </router-link>
+              </div>
 
-            <!-- Ikona logowania na małych ekranach -->
-            <button
-              @click="toggleLogin"
-              class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 cursor-pointer flex-shrink-0"
-              title="Zaloguj się"
-            >
-              <i class="fas fa-sign-in-alt text-gray-600"></i>
-            </button>
+              <!-- Ikona logowania na małych ekranach -->
+              <button
+                @click="toggleLogin"
+                class="md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 cursor-pointer flex-shrink-0"
+                title="Zaloguj się"
+              >
+                <i class="fas fa-sign-in-alt text-gray-600"></i>
+              </button>
+            </template>
           </template>
 
           <!-- Hamburger -->
@@ -277,46 +391,24 @@ const handleLogoClick = () => {
       <div class="w-full mx-auto px-3 sm:px-4 md:px-6">
         <div class="px-2 pt-2 pb-3 space-y-1">
           <router-link
-            to="/planner"
+            v-for="item in navigationItems"
+            :key="item.path"
+            :to="item.to"
             class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
-            :class="{ 'mobile-active': $route.path === '/planner' }"
-            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
+            :class="{ 'mobile-active': $route.path === item.path }"
+            @click="handleNavigationClick(item)"
           >
-            Planer
-          </router-link>
-          <router-link
-            to="/flights"
-            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
-            :class="{ 'mobile-active': $route.path === '/flights' }"
-            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
-          >
-            Loty
-          </router-link>
-          <router-link
-            to="/accommodations"
-            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
-            :class="{ 'mobile-active': $route.path === '/accommodations' }"
-            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
-          >
-            Noclegi
-          </router-link>
-          <router-link
-            to="/attractions"
-            class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer mobile-nav-link"
-            :class="{ 'mobile-active': $route.path === '/attractions' }"
-            @click="isMobileMenuOpen = false; setBodyOverflow(false)"
-          >
-            Atrakcje
+            {{ item.label }}
           </router-link>
         </div>
-        
-        <div class="pt-4 pb-3 border-t border-gray-200">
+
+        <div v-if="showLanguageSelector" class="pt-4 pb-3 border-t border-gray-200">
           <!-- Język i Waluta -->
           <div class="flex items-center justify-between px-4">
             <div class="flex items-center">
               <div class="flex flex-col cursor-pointer" @click="toggleLanguageCurrency(true)">
                 <div class="px-1 py-1 text-xs text-gray-500">Język i waluta</div>
-                <div class="text-sm text-gray-700 font-medium">PL / PLN</div>
+                <div class="text-sm text-gray-700 font-medium">{{ currentDisplayText }}</div>
               </div>
             </div>
           </div>
@@ -344,7 +436,7 @@ const handleLogoClick = () => {
         </button>
       </div>
 
-      <!-- Karty zaminy języka/ waluty -->
+      <!-- Karty zamiany języka/waluty -->
       <div class="border-b border-gray-200">
         <div class="flex">
           <button
@@ -378,9 +470,17 @@ const handleLogoClick = () => {
           <div
             class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 xs:gap-4"
           >
-            <div class="p-2 xs:p-3 rounded border border-gray-200 hover:bg-gray-100 cursor-pointer">
-              <div class="font-medium text-sm xs:text-base">Polski</div>
-              <div class="text-xs text-gray-500">PL</div>
+            <div
+              v-for="language in languageOptions"
+              :key="language.code"
+              class="p-2 xs:p-3 rounded border border-gray-200 hover:bg-gray-100 cursor-pointer"
+              :class="{ 'bg-green-50 border-green-500': selectedLanguage.code === language.code }"
+              @click="selectLanguage(language)"
+            >
+              <div class="font-medium text-sm xs:text-base">
+                {{ language.flag }} {{ language.name }}
+              </div>
+              <div class="text-xs text-gray-500">{{ language.code.toUpperCase() }}</div>
             </div>
           </div>
         </div>
@@ -393,9 +493,17 @@ const handleLogoClick = () => {
           <div
             class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 xs:gap-4"
           >
-            <div class="p-2 xs:p-3 rounded border border-gray-200 hover:bg-gray-100 cursor-pointer">
-              <div class="font-medium text-sm xs:text-base">Polski Złoty</div>
-              <div class="text-xs text-gray-500">PLN</div>
+            <div
+              v-for="currency in currencyOptions"
+              :key="currency.code"
+              class="p-2 xs:p-3 rounded border border-gray-200 hover:bg-gray-100 cursor-pointer"
+              :class="{ 'bg-green-50 border-green-500': selectedCurrency.code === currency.code }"
+              @click="selectCurrency(currency)"
+            >
+              <div class="font-medium text-sm xs:text-base">
+                {{ currency.symbol }} {{ currency.name }}
+              </div>
+              <div class="text-xs text-gray-500">{{ currency.code }}</div>
             </div>
           </div>
         </div>
