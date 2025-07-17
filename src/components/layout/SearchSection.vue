@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 
 const checkInInput = ref<HTMLInputElement | null>(null)
@@ -7,8 +7,63 @@ const checkOutInput = ref<HTMLInputElement | null>(null)
 const checkInDate = ref('')
 const checkOutDate = ref('')
 
+// Lokalizacja input i dropdown
+const locationInput = ref('')
+const showLocationSuggestions = ref(false)
+
 // Dzisiejsza data do ograniczenia minimalnej wartości
 const today = new Date().toISOString().split('T')[0]
+
+// Popularne lokalizacje hotelowe (kody miast IATA)
+const popularLocations = [
+  { code: 'WAW', name: 'Warszawa' },
+  { code: 'KRK', name: 'Kraków' },
+  { code: 'GDN', name: 'Gdańsk' },
+  { code: 'WRO', name: 'Wrocław' },
+  { code: 'POZ', name: 'Poznań' },
+  { code: 'KTW', name: 'Katowice' },
+  { code: 'BCN', name: 'Barcelona' },
+  { code: 'ROM', name: 'Rzym' },
+  { code: 'PAR', name: 'Paryż' },
+  { code: 'LON', name: 'Londyn' },
+  { code: 'BER', name: 'Berlin' },
+  { code: 'VIE', name: 'Wiedeń' },
+  { code: 'PRA', name: 'Praga' },
+  { code: 'AMS', name: 'Amsterdam' },
+  { code: 'MAD', name: 'Madryt' },
+  { code: 'LIS', name: 'Lizbona' },
+  { code: 'ATH', name: 'Ateny' },
+  { code: 'IST', name: 'Stambuł' },
+  { code: 'DXB', name: 'Dubaj' },
+  { code: 'NYC', name: 'Nowy Jork' },
+  { code: 'TYO', name: 'Tokio' },
+  { code: 'BKK', name: 'Bangkok' },
+  { code: 'SIN', name: 'Singapur' },
+]
+
+// Filtrowane podpowiedzi lokalizacji
+const locationSuggestions = computed(() => {
+  if (!locationInput.value) return []
+  const searchTerm = locationInput.value.toLowerCase()
+  return popularLocations.filter(
+    (location) =>
+      location.name.toLowerCase().includes(searchTerm) || 
+      location.code.toLowerCase().includes(searchTerm)
+  )
+})
+
+// Obsługa wyboru lokalizacji
+const selectLocationSuggestion = (suggestion: { code: string; name: string }) => {
+  locationInput.value = `${suggestion.name} (${suggestion.code})`
+  showLocationSuggestions.value = false
+}
+
+// Obsługa ukrycia podpowiedzi lokalizacji
+const hideLocationSuggestions = () => {
+  setTimeout(() => {
+    showLocationSuggestions.value = false
+  }, 200)
+}
 
 // Funkcja do określenia optymalnej pozycji kalendarza
 const getOptimalCalendarPosition = () => {
@@ -59,7 +114,7 @@ const formatDisplayDate = (dateString: string) => {
 }
 
 const guestsInput = ref<HTMLSelectElement | null>(null)
-const selectedGuests = ref('2 osoby, 1 łóżko')
+const selectedGuests = ref('2')
 
 const openGuestsPicker = () => {
   if (guestsInput.value) {
@@ -68,15 +123,54 @@ const openGuestsPicker = () => {
 }
 
 const guestOptions = [
-  '1 osoba, 1 łóżko',
-  '2 osoby, 1 łóżko',
-  '2 osoby, 2 łóżka',
-  '3 osoby, 2 łóżka',
-  '3 osoby, 3 łóżka',
-  '4 osoby, 2 łóżka',
-  '4 osoby, 3 łóżka',
-  '4 osoby, 4 łóżka'
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8+'
 ]
+
+// Funkcjonalność wyszukiwania
+const emit = defineEmits(['search'])
+
+const isSearching = ref(false)
+
+const handleSearch = () => {
+  if (!locationInput.value || !checkInDate.value || !checkOutDate.value) {
+    alert('Proszę wypełnić wszystkie pola')
+    return
+  }
+
+  // Walidacja dat
+  const checkInDateObj = new Date(checkInDate.value)
+  const checkOutDateObj = new Date(checkOutDate.value)
+  
+  if (checkOutDateObj <= checkInDateObj) {
+    alert('Data wymeldowania musi być późniejsza niż data zameldowania')
+    return
+  }
+
+  // Wyciągnij kod miasta z inputa (np. "Warszawa (WAW)" -> "WAW")
+  const cityCodeMatch = locationInput.value.match(/\(([^)]+)\)/)
+  const cityCode = cityCodeMatch ? cityCodeMatch[1] : locationInput.value
+
+  isSearching.value = true
+
+  emit('search', {
+    cityCode,
+    checkIn: checkInDate.value,
+    checkOut: checkOutDate.value,
+    guests: selectedGuests.value
+  })
+
+  // Zatrzymaj loading po 2 sekundach
+  setTimeout(() => {
+    isSearching.value = false
+  }, 2000)
+}
 </script>
 
 <template>
@@ -97,16 +191,36 @@ const guestOptions = [
     <div class="container mx-auto px-4">
       <form class="grid grid-cols-1 md:grid-cols-4 gap-5">
         <!-- lokalizacja -->
-        <div class="flex flex-col">
+        <div class="flex flex-col relative">
           <span class="text-sm text-gray-600 mb-1">Lokalizacja</span>
-          <div 
-            class="relative w-full text-left bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 hover:border-gray-400 transition-colors cursor-pointer"
+          <input
+            type="text"
+            v-model="locationInput"
+            placeholder="Gdzie chcesz nocować?"
+            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 transition-all bg-gray-50"
+            @focus="showLocationSuggestions = true"
+            @blur="hideLocationSuggestions"
+            aria-label="Lokalizacja"
+          />
+          <div
+            v-if="showLocationSuggestions && locationSuggestions.length > 0"
+            class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md overflow-hidden top-full"
+            role="listbox"
+            aria-label="Sugestie lokalizacji"
           >
-            <input
-              type="text"
-              placeholder="Gdzie chcesz nocować?"
-              class="w-full bg-transparent text-sm text-gray-900 cursor-pointer focus:outline-none focus:ring-0"
-            />
+            <ul class="max-h-60 overflow-auto">
+              <li
+                v-for="suggestion in locationSuggestions"
+                :key="suggestion.code"
+                @mousedown="selectLocationSuggestion(suggestion)"
+                class="px-4 py-2 hover:bg-gray-100 cursor-pointer focus-within:bg-primary-50"
+                role="option"
+                tabindex="0"
+                @keydown.enter="selectLocationSuggestion(suggestion)"
+              >
+                {{ suggestion.name }} ({{ suggestion.code }})
+              </li>
+            </ul>
           </div>
         </div>
 
@@ -192,7 +306,17 @@ const guestOptions = [
 
         <!-- search button with improved spacing -->
         <div class="md:col-span-4 flex justify-center mt-6">
-          <AnimatedButton class="px-8 py-3">Szukaj</AnimatedButton>
+          <AnimatedButton 
+            class="px-8 py-3"
+            :disabled="isSearching"
+            @click="handleSearch"
+          >
+            <span v-if="!isSearching">Szukaj</span>
+            <span v-else class="flex items-center">
+              <i class="fas fa-spinner fa-spin mr-2"></i>
+              Szukam...
+            </span>
+          </AnimatedButton>
         </div>
       </form>
     </div>
