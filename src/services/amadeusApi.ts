@@ -9,6 +9,13 @@ interface FlightSearchParams {
   adults: number;
 }
 
+interface HotelSearchParams {
+  cityCode: string;
+  checkInDate: string;
+  checkOutDate: string;
+  adults: number;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -49,6 +56,31 @@ export async function searchFlights(params: FlightSearchParams): Promise<ApiResp
   }
 }
 
+// Search hoteli
+export async function searchHotels(params: HotelSearchParams): Promise<ApiResponse<any>> {
+  try {
+    // Buduje parametry requestu
+    const queryParams = new URLSearchParams({
+      cityCode: params.cityCode,
+      checkInDate: params.checkInDate,
+      checkOutDate: params.checkOutDate,
+      adults: params.adults.toString()
+    });
+
+    const response = await fetch(`${API_BASE_URL}/hotels/search?${queryParams.toString()}`);
+    const data = await response.json();
+
+    return data;
+  } catch (error) {
+    console.error('Błąd podczas wyszukiwania hoteli:', error);
+    return {
+      success: false,
+      error: 'Nie udało się pobrać danych o hotelach. Spróbuj ponownie później.'
+    };
+  }
+}
+
+
 /**
  * Sprawdź stan zdrowia serwera API
  */
@@ -66,5 +98,6 @@ export async function checkApiHealth(): Promise<boolean> {
 // Eksportuj serwis jako domyślny
 export default {
   searchFlights,
+  searchHotels,
   checkApiHealth
 };
