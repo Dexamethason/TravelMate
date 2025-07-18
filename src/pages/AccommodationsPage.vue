@@ -6,126 +6,20 @@ import SectionHeading from '@/components/layout/SectionHeading.vue'
 import MapPlaceholder from '@/components/layout/MapPlaceholder.vue'
 import AnimatedButton from '@/components/ui/AnimatedButton.vue'
 import { ref, computed } from 'vue'
-
-const isFilterOpen = ref(false)
-const sortBy = ref('recommended')
-
-// XDDDD
-import hotel1 from '@/assets/mock/hotel1.jpg'
-import hotel2 from '@/assets/mock/hotel2.jpg'
-import hotel3 from '@/assets/mock/hotel3.jpg'
+import { searchHotels } from '@/services/amadeusApi'
 
 // TO JEST CHYBA ZLE, ALE NIE UMIALME INACZEJ XDD
 import heroSmall from '@/assets/images/hero/accomodation-hero-small.jpg'
 import heroBig from '@/assets/images/hero/accomodation-hero-big.jpg'
 
-const mockAccommodations = [
-  {
-    id: 1,
-    title: 'Grand Hotel',
-    description: 'Luksusowy hotel w centrum miasta',
-    price: 450,
-    rating: 5.0,
-    image: hotel1,
-    amenities: ['Parking', 'WiFi', 'Restauracja', 'Basen', 'Spa'],
-    address: 'Warszawa, 350m od centrum',
-    distanceFromCenter: 0.35,
-    stars: 5,
-    features: {
-      breakfast: true,
-      freeCancel: true,
-      parking: true,
-      wifi: true,
-      pool: true,
-      gym: true,
-      airCon: true
-    }
-  },
-  {
-    id: 2,
-    title: 'Apartamenty Centrum',
-    description: 'Przytulne apartamenty',
-    price: 280,
-    rating: 4.2,
-    image: hotel2,
-    amenities: ['WiFi', 'Kuchnia'],
-    address: 'Warszawa, 1.2km od centrum',
-    distanceFromCenter: 1.2,
-    stars: 3,
-    features: {
-      breakfast: false,
-      freeCancel: true,
-      parking: false,
-      wifi: true,
-      pool: false,
-      gym: false,
-      airCon: true
-    }
-  },
-  {
-    id: 3,
-    title: 'Urzond wojewodzki',
-    description: 'Spokojny hotel z ogrodem',
-    price: 999,
-    rating: 1,
-    image: hotel3,
-    amenities: ['Parking', 'WiFi', 'Sala konferencyjna'],
-    address: 'Warszawa, 2.5km od centrum',
-    distanceFromCenter: 2.5,
-    stars: 4,
-    features: {
-      breakfast: true,
-      freeCancel: false,
-      parking: true,
-      wifi: true,
-      pool: false,
-      gym: true,
-      airCon: true
-    }
-  },
-  {
-    id: 4,
-    title: 'Resort & Spa',
-    description: 'Luksusowy resort z basenem',
-    price: 850,
-    rating: 4.9,
-    image: hotel1,
-    amenities: ['Parking', 'WiFi', 'Spa', 'Basen', 'Restauracja'],
-    address: 'Warszawa, 4.2km od centrum',
-    distanceFromCenter: 4.2,
-    stars: 5,
-    features: {
-      breakfast: true,
-      freeCancel: true,
-      parking: true,
-      wifi: true,
-      pool: true,
-      gym: true,
-      airCon: true
-    }
-  },
-  {
-    id: 5,
-    title: 'Hotel Ogrodowy',
-    description: 'Spokojny hotel z ogrodem',
-    price: 320,
-    rating: 4.1,
-    image: hotel2,
-    amenities: ['Parking', 'Ogród'],
-    address: 'Warszawa, 5km od centrum',
-    distanceFromCenter: 5.0,
-    stars: 3,
-    features: {
-      breakfast: true,
-      freeCancel: true,
-      parking: true,
-      wifi: true,
-      pool: false,
-      gym: false,
-      airCon: true
-    }
-  }
-]
+const isFilterOpen = ref(false)
+const sortBy = ref('recommended')
+
+// Stan wyszukiwania
+const hotels = ref<any[]>([])
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+const hasSearched = ref(false)
 
 const selectedFilters = {
   city: 'Warszawa',
@@ -135,6 +29,76 @@ const selectedFilters = {
   },
   guests: '2 dorosłych, 1 pokój',
 }
+
+// Funkcja do wyszukiwania hoteli z parametrami
+const handleHotelSearch = async (searchParams: {
+  cityCode: string
+  checkIn: string
+  checkOut: string
+  guests: string
+}) => {
+  isLoading.value = true
+  error.value = null
+  hasSearched.value = true
+  
+  try {
+    // Konwertuje gości na liczbę
+    const guestsNumber = searchParams.guests === '8+' ? 8 : parseInt(searchParams.guests) || 2;
+    
+    const response = await searchHotels({ 
+      cityCode: searchParams.cityCode,
+      checkInDate: searchParams.checkIn,
+      checkOutDate: searchParams.checkOut,
+      adults: guestsNumber
+    })
+    
+    if (response.success && response.data) {
+      // Przekształca dane z API Amadeus na format używany w interfejsie
+      hotels.value = response.data.map((hotel: any, index: number) => {
+        // Znajduje najlepszą ofertę (najtańszą)
+        const bestOffer = hotel.offers?.[0]?.offers?.[0];
+        const price = bestOffer?.price?.total || 0;
+        const currency = bestOffer?.price?.currency || 'EUR';
+        
+        return {
+          id: index + 1,
+          title: hotel.name || 'Hotel bez nazwy',
+          description: `${hotel.address?.cityName || ''} ${hotel.address?.countryCode || ''}`.trim() || 'Opis niedostępny',
+          price: parseFloat(price),
+          currency: currency,
+          rating: hotel.offers?.[0]?.hotel?.rating || 0,
+          image: `https://via.placeholder.com/300x200?text=Hotel+${index + 1}`,
+          amenities: hotel.offers?.[0]?.hotel?.amenities || [],
+          address: `${hotel.address?.lines?.join(', ') || ''} ${hotel.address?.cityName || ''}`.trim() || 'Adres niedostępny',
+          distanceFromCenter: hotel.distance?.value || 0,
+          stars: hotel.offers?.[0]?.hotel?.rating || 0,
+          hotelId: hotel.hotelId,
+          geoCode: hotel.geoCode,
+          offers: hotel.offers,
+          // TODO: Dodać prawdziwe udogodnienia zamiast tego xD
+          features: {
+            breakfast: true,
+            freeCancel: true,
+            parking: true,
+            wifi: true,
+            pool: false,
+            gym: false,
+            airCon: true
+          }
+        }
+      })
+    } else {
+      throw new Error(response.error || 'Błąd podczas wyszukiwania hoteli')
+    }
+  } catch (err) {
+    error.value = (err as Error).message || 'Nie udało się pobrać danych o hotelach'
+    console.error('Błąd wyszukiwania hoteli:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+
 
 // Add sorting options
 const sortOptions = [
@@ -183,7 +147,7 @@ const activeFilters = ref({
 
 // filtrowane hotele
 const filteredAccommodations = computed(() => {
-  return mockAccommodations.filter(hotel => {
+  return hotels.value.filter(hotel => {
     // filtr ceny
     if (hotel.price > activeFilters.value.budget) {
       return false
@@ -212,7 +176,7 @@ const filteredAccommodations = computed(() => {
 // połączone filtrowanie i sortowanie
 const filteredAndSortedAccommodations = computed(() => {
   // najpierw filtrujemy
-  const filtered = mockAccommodations.filter(hotel => {
+  const filtered = hotels.value.filter(hotel => {
     // filtr ceny
     if (hotel.price > activeFilters.value.budget) {
       return false
@@ -301,60 +265,66 @@ const handleFilters = (filters: any) => {
     <section class="relative z-20 -mt-24 mb-16">
       <div class="container mx-auto px-4">
         <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-          <SearchSection />
+          <SearchSection @search="handleHotelSearch" />
         </div>
       </div>
     </section>
 
+    <!-- Loading state -->
+    <div v-if="isLoading" class="flex justify-center items-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Error state -->
+    <div v-if="error && !isLoading" class="flex justify-center items-center py-12">
+      <div class="text-red-600 text-center">
+        <p class="text-lg font-semibold">Wystąpił błąd</p>
+        <p class="mt-2">{{ error }}</p>
+      </div>
+    </div>
+
     <!-- glowna sekcja z hotelami -->
-    <section class="bg-gray-50 pt-4 pb-12">
-      <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div class="flex flex-col lg:flex-row gap-4 sm:gap-8">
-          <!-- sidebar -->
-          <aside class="w-full lg:w-1/4">
-            <!-- map (desktop only) -->
-            <div class="hidden lg:block bg-white rounded-lg shadow-md overflow-hidden mb-6">
-              <MapPlaceholder class="h-[250px] w-full object-cover" />
-            </div>
-            
-            <!-- mobilny przycisk do filtrow -->
-            <div class="fixed bottom-4 left-3 right-3 z-40 lg:hidden">
-              <AnimatedButton 
-                variant="primary" 
-                class="w-full flex items-center justify-center gap-2"
-                @click="isFilterOpen = true"
+    <section v-if="hasSearched && !isLoading && !error" class="py-6 sm:py-8 md:py-12 bg-gray-50">
+      <div class="container mx-auto px-4">
+        <!-- filtry na mobile -->
+        <div class="lg:hidden mb-6">
+          <AnimatedButton 
+            @click="isFilterOpen = !isFilterOpen"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm p-3 border border-gray-200"
+          >
+            <span class="text-gray-700 font-medium">Filtry</span>
+            <i 
+              :class="isFilterOpen ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"
+              class="text-gray-500 transition-transform"
+            ></i>
+          </AnimatedButton>
+          
+          <div v-if="isFilterOpen" class="mt-4 bg-white rounded-lg shadow-sm border border-gray-200">
+            <FiltersSidebar 
+              @apply-filters="handleFilters"
+              class="p-4"
+            />
+          </div>
+        </div>
 
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-                  />
-                </svg>
-                Filtry
-              </AnimatedButton>
-            </div>
-
-            <!-- filtry na desktop -->
-            <div class="hidden lg:block">
+        <div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          <!-- sidebar z filtrami na desktop -->
+          <aside class="w-full lg:w-1/4 order-2 lg:order-1">
+            <div class="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200">
               <FiltersSidebar 
-                :is-open="isFilterOpen" 
-                @close="isFilterOpen = false" 
                 @apply-filters="handleFilters"
-                @reset-filters="() => handleFilters({ budget: 1000, features: [], stars: [] })"
+                class="p-4 md:p-6"
               />
             </div>
           </aside>
 
           <!-- main content -->
-          <main class="w-full lg:w-3/4">
+          <main class="w-full lg:w-3/4 order-1 lg:order-2">
             <!-- header with counter -->
-            <div class="bg-white rounded-lg shadow-md p-2 sm:p-3 md:p-4">
+            <div class="bg-white rounded-lg shadow-md p-2 sm:p-3 md:p-4 mb-6">
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <h2 class="text-sm sm:text-base md:text-lg font-semibold text-gray-800">
-                  Znaleziono {{ mockAccommodations.length }} obiektów
+                  Znaleziono {{ filteredAndSortedAccommodations.length }} obiektów
                 </h2>
                 <!-- Add sorting controls -->
                 <select 
@@ -370,9 +340,6 @@ const handleFilters = (filters: any) => {
               </div>
             </div>
 
-            <!-- separator -->
-            <div class="h-4 sm:h-6 md:h-8"></div>
-
             <!-- lista hoteli -->
             <div class="bg-transparent pb-24 lg:pb-0">
               <AccommodationsList 
@@ -381,6 +348,18 @@ const handleFilters = (filters: any) => {
             </div>
           </main>
         </div>
+      </div>
+    </section>
+
+    <!-- Initial state - before search -->
+    <section v-if="!hasSearched" class="py-12 bg-gray-50">
+      <div class="container mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          Rozpocznij wyszukiwanie
+        </h2>
+        <p class="text-gray-600 mb-8">
+          Kliknij jeden z przycisków powyżej, aby wyszukać hotele za pomocą API Amadeus
+        </p>
       </div>
     </section>
   </div>
